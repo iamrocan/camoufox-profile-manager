@@ -3,16 +3,17 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarClock, Layers, LogOut, Settings, Users } from 'lucide-react'
+import { CalendarClock, ChevronDown, Globe, Layers, LogOut, Settings, Users } from 'lucide-react'
 
 import { useAuth } from '@/components/login-gate'
 import { systemAPI } from '@/lib/api'
+import { LOCALES, useI18n, type Locale, type MessageKey } from '@/lib/i18n'
 
-const NAV = [
-  { href: '/', label: 'Profiles', icon: Users },
-  { href: '/groups/', label: 'Groups', icon: Layers },
-  { href: '/schedules/', label: 'Schedules', icon: CalendarClock },
-  { href: '/settings/', label: 'Settings', icon: Settings },
+const NAV: { href: string; label: MessageKey; icon: typeof Users }[] = [
+  { href: '/', label: 'nav.profiles', icon: Users },
+  { href: '/groups/', label: 'nav.groups', icon: Layers },
+  { href: '/schedules/', label: 'nav.schedules', icon: CalendarClock },
+  { href: '/settings/', label: 'nav.settings', icon: Settings },
 ]
 
 /** Fixed rail + scrollable work area. The rail never scrolls. */
@@ -22,6 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const current = pathname.replace(/\/+$/, '') || '/'
   const [address, setAddress] = useState<string | null>(null)
   const { username, logout } = useAuth()
+  const { t, locale, setLocale } = useI18n()
 
   useEffect(() => {
     // Report where the server actually is rather than assuming loopback.
@@ -54,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 <Icon size={15} strokeWidth={1.75} className={active ? 'text-signal' : ''} />
-                {label}
+                {t(label)}
               </Link>
             )
           })}
@@ -69,14 +71,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={logout}
-                aria-label="Log out"
-                title="Log out"
+                aria-label={t('nav.logout')}
+                title={t('nav.logout')}
                 className="rounded p-1 text-ink-faint transition-colors hover:bg-raised hover:text-ink"
               >
                 <LogOut size={14} strokeWidth={1.75} />
               </button>
             </div>
           )}
+
+          <div className="border-t border-line px-3 py-2">
+            <label htmlFor="locale" className="sr-only">
+              {t('nav.language')}
+            </label>
+            <div className="relative">
+              <Globe
+                size={13}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-ink-faint"
+              />
+              <select
+                id="locale"
+                value={locale}
+                onChange={(event) => setLocale(event.target.value as Locale)}
+                title={t('nav.language')}
+                className="w-full cursor-pointer appearance-none rounded-md bg-transparent py-1.5 pl-7 pr-6 text-ink-dim transition-colors hover:bg-raised/60 hover:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-signal"
+              >
+                {Object.entries(LOCALES).map(([code, name]) => (
+                  <option key={code} value={code} className="bg-surface text-ink">
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={13}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint"
+              />
+            </div>
+          </div>
+
           <div className="px-4 py-3 font-mono text-[11px] text-ink-faint">{address ?? '—'}</div>
         </div>
       </aside>

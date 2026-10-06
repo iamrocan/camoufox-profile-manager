@@ -27,6 +27,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ConfirmDialog, Modal } from '@/components/modal'
 import { ProfileForm } from '@/components/profile-form'
 import { useToast } from '@/components/toast'
+import { useT } from '@/lib/i18n'
 import {
   browsersAPI,
   formatLastUsed,
@@ -81,6 +82,7 @@ export default function ProfilesPage() {
   const [exportOpen, setExportOpen] = useState(false)
 
   const toast = useToast()
+  const t = useT()
   const importRef = useRef<HTMLInputElement>(null)
   const archiveRef = useRef<HTMLInputElement>(null)
 
@@ -418,34 +420,34 @@ export default function ProfilesPage() {
       const updated = await profilesAPI.toggleProxyPaused(profile.id)
       toast(
         'ok',
-        updated.proxy_paused ? 'Proxy paused' : 'Proxy resumed',
-        updated.proxy_paused
-          ? `${profile.name} will launch without its proxy until you resume it.`
-          : `${profile.name} will launch with its proxy again.`,
+        t(updated.proxy_paused ? 'proxy.pausedTitle' : 'proxy.resumedTitle'),
+        t(updated.proxy_paused ? 'proxy.pausedBody' : 'proxy.resumedBody', {
+          name: profile.name,
+        }),
       )
       loadProfiles()
     } catch (err) {
-      toast('error', 'Could not toggle proxy', String(err))
+      toast('error', t('proxy.toggleFailed'), String(err))
     }
   }
 
   function askClearData(profile: Profile) {
     setConfirm({
-      title: 'Clear browser data',
-      body: `Cookies, cache, history, local/session storage and downloads for "${profile.name}" will be wiped. The fingerprint, proxy and settings are kept — the profile keeps its identity but opens like a fresh install. This cannot be undone.`,
-      label: 'Clear data',
+      title: t('clear.title'),
+      body: t('clear.body', { name: profile.name }),
+      label: t('clear.confirm'),
       run: async () => {
         try {
           const result = await profilesAPI.clearData(profile.id)
           const mb = (result.bytes_removed / 1_048_576).toFixed(1)
           toast(
             'ok',
-            `Cleared ${profile.name}`,
-            `${result.files_removed} files removed (${mb} MB). The fingerprint was kept.`,
+            t('clear.doneTitle', { name: profile.name }),
+            t('clear.doneBody', { files: result.files_removed, mb }),
           )
           loadProfiles()
         } catch (err) {
-          toast('error', 'Could not clear data', String(err))
+          toast('error', t('clear.failed'), String(err))
         }
       },
     })
@@ -566,24 +568,28 @@ export default function ProfilesPage() {
           />
           <input
             className="field h-[30px] pl-7"
-            placeholder="Search name or ID"
+            placeholder={t('profiles.search')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            aria-label="Search profiles"
+            aria-label={t('profiles.searchLabel')}
           />
         </div>
 
         <select
-          className="field h-[30px] w-[132px]"
+          // Wide enough for the longest translated label ("Todos los estados"),
+          // not just the English one. Fixed rather than min-width: this sits in
+          // a flex row, where a min-width with no width grows to fill and pushes
+          // the toolbar buttons off the edge.
+          className="field h-[30px] w-[168px] shrink-0"
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
-          aria-label="Filter by status"
+          aria-label={t('profiles.filterByStatus')}
         >
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="blocked">Blocked</option>
-          <option value="maintenance">Maintenance</option>
+          <option value="all">{t('profiles.allStatuses')}</option>
+          <option value="active">{t('statusOpt.active')}</option>
+          <option value="inactive">{t('statusOpt.inactive')}</option>
+          <option value="blocked">{t('statusOpt.blocked')}</option>
+          <option value="maintenance">{t('statusOpt.maintenance')}</option>
         </select>
 
         <div className="ml-auto flex items-center gap-2">
@@ -593,13 +599,13 @@ export default function ProfilesPage() {
               Close {running.size} running
             </button>
           )}
-          <button className="btn btn-ghost" onClick={() => setExportOpen(true)} title="Export to Excel">
+          <button className="btn btn-ghost" onClick={() => setExportOpen(true)} title={t('profiles.exportExcel')}>
             <Download size={14} />
           </button>
           <button
             className="btn btn-ghost"
             onClick={() => importRef.current?.click()}
-            title="Import from Excel"
+            title={t('profiles.importExcel')}
           >
             <Upload size={14} />
           </button>
@@ -613,7 +619,7 @@ export default function ProfilesPage() {
           <button
             className="btn btn-ghost"
             onClick={() => archiveRef.current?.click()}
-            title="Import a profile archive"
+            title={t('profiles.importArchive')}
           >
             <PackageOpen size={14} />
           </button>
@@ -632,7 +638,7 @@ export default function ProfilesPage() {
             }}
           >
             <Plus size={14} strokeWidth={2.5} />
-            New profile
+            {t('profiles.new')}
           </button>
         </div>
       </header>
@@ -725,7 +731,7 @@ export default function ProfilesPage() {
                   type="checkbox"
                   className="accent-signal"
                   checked={allOnPageSelected}
-                  aria-label="Select all on this page"
+                  aria-label={t('profiles.selectAll')}
                   onChange={() =>
                     setSelected((current) => {
                       const next = new Set(current)
@@ -864,7 +870,7 @@ export default function ProfilesPage() {
                           >
                             <MenuItem
                               icon={<Pencil size={13} />}
-                              label="Edit"
+                              label={t('action.edit')}
                               autoFocus
                               onClick={() => {
                                 setEditing(profile)
@@ -874,7 +880,7 @@ export default function ProfilesPage() {
                             />
                             <MenuItem
                               icon={<Copy size={13} />}
-                              label="Duplicate"
+                              label={t('action.duplicate')}
                               onClick={() => {
                                 clone(profile)
                                 closeMenu(profile.id)
@@ -882,7 +888,7 @@ export default function ProfilesPage() {
                             />
                             <MenuItem
                               icon={<Globe size={13} />}
-                              label="Check proxy"
+                              label={t('action.checkProxy')}
                               onClick={() => {
                                 // The set holds ids, not a count, so a second
                                 // check of the same row would clear the first
@@ -894,7 +900,11 @@ export default function ProfilesPage() {
                             {profile.proxy_config ? (
                               <MenuItem
                                 icon={profile.proxy_paused ? <Play size={13} /> : <Pause size={13} />}
-                                label={profile.proxy_paused ? 'Resume proxy' : 'Pause proxy'}
+                                label={t(
+                                  profile.proxy_paused
+                                    ? 'action.resumeProxy'
+                                    : 'action.pauseProxy',
+                                )}
                                 onClick={() => {
                                   toggleProxyPaused(profile)
                                   closeMenu(profile.id)
@@ -903,7 +913,7 @@ export default function ProfilesPage() {
                             ) : null}
                             <MenuItem
                               icon={<PackageOpen size={13} />}
-                              label="Export…"
+                              label={t('action.export')}
                               onClick={() => {
                                 exportArchive(profile)
                                 closeMenu(profile.id)
@@ -911,7 +921,7 @@ export default function ProfilesPage() {
                             />
                             <MenuItem
                               icon={<Eraser size={13} />}
-                              label="Clear data"
+                              label={t('action.clearData')}
                               onClick={() => {
                                 askClearData(profile)
                                 closeMenu(profile.id)
@@ -919,7 +929,7 @@ export default function ProfilesPage() {
                             />
                             <MenuItem
                               icon={<Trash2 size={13} />}
-                              label="Delete"
+                              label={t('action.delete')}
                               danger
                               onClick={() => {
                                 askDelete(profile)
@@ -1019,6 +1029,7 @@ export default function ProfilesPage() {
  * checked looks exactly as it did before.
  */
 function ProxyCell({ profile, checking }: { profile: Profile; checking: boolean }) {
+  const t = useT()
   const configured = formatProxyString(profile.proxy_config) || '—'
   const check = profile.proxy_check
   const paused = Boolean(profile.proxy_config && profile.proxy_paused)
@@ -1035,9 +1046,9 @@ function ProxyCell({ profile, checking }: { profile: Profile; checking: boolean 
         {paused ? (
           <span
             className="shrink-0 rounded-full border border-warn/40 bg-warn/10 px-1.5 py-[1px] text-[10px] font-medium uppercase tracking-wide text-warn"
-            title="Proxy paused: next launch will not use it. Toggle from the row menu."
+            title={t('proxy.pausedHint')}
           >
-            paused
+            {t('status.paused')}
           </span>
         ) : null}
       </div>
