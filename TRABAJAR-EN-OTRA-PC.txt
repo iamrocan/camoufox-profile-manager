@@ -1,0 +1,241 @@
+===============================================================================
+  CAMOUFOX PROFILE MANAGER - Trabajar con Claude Code desde otra PC
+  Repositorio: https://github.com/iamrocan/camoufox-profile-manager
+===============================================================================
+
+Esto es para DESARROLLAR (editar codigo y hacer commits), no solo para usar la
+app. Si lo unico que quieres es instalarla y usarla, usa install.py en su lugar.
+
+Copia este archivo a la otra PC (USB, correo, lo que sea). Tambien esta en el
+repositorio, pero lo necesitas antes de clonarlo.
+
+
+-------------------------------------------------------------------------------
+0. ANTES DE EMPEZAR - donde NO instalarlo
+-------------------------------------------------------------------------------
+
+NO lo pongas en el Escritorio si OneDrive lo sincroniza (en tu otra PC, SI lo
+sincroniza). La base de perfiles es SQLite en modo WAL: son tres archivos que
+solo valen juntos, y OneDrive los sube cuando le toca. Asi se corrompe.
+
+Usa una ruta local y corta, por ejemplo:   C:\dev\camoufox
+
+Corta tambien importa: Windows corta las rutas a 260 caracteres y el bundle de
+la interfaz tiene nombres largos y anidados.
+
+
+-------------------------------------------------------------------------------
+1. QUE NECESITAS INSTALADO
+-------------------------------------------------------------------------------
+
+  Python 3.10 o superior      https://python.org        (obligatorio)
+  Git                         https://git-scm.com       (obligatorio)
+  Node.js 24                  https://nodejs.org        (solo si tocas la interfaz)
+  Claude Code                 https://claude.com/claude-code
+  GitHub CLI (gh)             https://cli.github.com    (la forma facil de autenticar)
+
+Comprueba que esten:
+
+  python --version
+  git --version
+  node --version
+
+
+-------------------------------------------------------------------------------
+2. CLONAR Y PREPARAR
+-------------------------------------------------------------------------------
+
+  mkdir C:\dev
+  cd C:\dev
+  git clone https://github.com/iamrocan/camoufox-profile-manager.git camoufox
+  cd camoufox
+
+NO uses --depth 1 aqui. Para desarrollar quieres el historial completo
+(git log, git blame, poder volver atras).
+
+Instala uv y las dependencias:
+
+  python -m pip install --upgrade uv
+  uv sync --extra dev --extra desktop
+  .venv\Scripts\camoufox fetch
+
+El extra "dev" trae pytest, ruff y mypy. El extra "desktop" trae pywebview, que
+es lo que da la ventana propia en vez de una pestana del navegador.
+
+Si te dice que "uv" no se reconoce, cierra la terminal y abre una nueva: el
+instalador lo pone en el PATH y las terminales ya abiertas no se enteran.
+
+OJO: si algun dia corres install.py en esta carpeta, vuelve a sincronizar con
+--extra dev, porque install.py sincroniza solo con --extra desktop y eso
+DESINSTALA pytest.
+
+
+-------------------------------------------------------------------------------
+3. IDENTIDAD DE GIT (sin esto no puedes commitear)
+-------------------------------------------------------------------------------
+
+Este repositorio no trae identidad configurada. Dentro de la carpeta:
+
+  git config user.name  "iamrocan"
+  git config user.email "60199671+iamrocan@users.noreply.github.com"
+
+Usa ese correo de noreply y no el personal: asi GitHub atribuye los commits a tu
+cuenta sin publicar tu direccion real.
+
+
+-------------------------------------------------------------------------------
+4. PERMISO PARA SUBIR (push)
+-------------------------------------------------------------------------------
+
+La forma facil:
+
+  gh auth login
+
+Elige: GitHub.com -> HTTPS -> autenticar con el navegador. Inicia sesion con la
+cuenta iamrocan (la del correo iamrocan@hotmail.com).
+
+Comprueba que funciona:
+
+  gh auth status
+  git push --dry-run origin main
+
+Si "git push" te pide usuario y contrasena, la contrasena NO es la de tu cuenta:
+GitHub ya no las acepta. Usa "gh auth login" o un token personal.
+
+
+-------------------------------------------------------------------------------
+5. COMPROBAR QUE TODO FUNCIONA
+-------------------------------------------------------------------------------
+
+  uv run --extra dev --extra desktop pytest -q
+
+Esperado: pasan todos MENOS UNO. El que falla es
+  tests/integration/test_api_profiles.py::test_creating_from_a_preset_pins_that_device
+y ya fallaba desde antes de este fork (un hueco de datos de Camoufox, no una
+regresion). Si falla solo ese, estas bien.
+
+Arranca la app:
+
+  .venv\Scripts\camoufox-pm.exe --desktop
+
+O doble clic en launch.vbs. Si algo falla, usa launch.bat: abre consola y
+muestra el error.
+
+
+-------------------------------------------------------------------------------
+6. TRABAJAR CON CLAUDE CODE
+-------------------------------------------------------------------------------
+
+Abre Claude Code en la carpeta del proyecto (C:\dev\camoufox).
+
+El repositorio incluye CLAUDE.md, que Claude lee solo al abrir el proyecto. Ahi
+estan las convenciones y las trampas de este proyecto, asi que no tienes que
+explicarselas cada vez.
+
+IMPORTANTE: la memoria de Claude Code NO viaja entre maquinas. Vive fuera del
+repositorio y .claude/ esta ignorado. Lo que esta en CLAUDE.md si viaja; lo que
+este solo en la memoria de la otra PC, no.
+
+Para que los commits queden iguales a los de esta maquina, el mensaje termina
+con esta linea:
+
+  Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+
+
+-------------------------------------------------------------------------------
+7. LAS TRES TRAMPAS QUE CUESTAN TIEMPO
+-------------------------------------------------------------------------------
+
+(a) SI CAMBIAS LA INTERFAZ, HAY QUE RECOMPILAR
+
+    El bundle compilado (src/camoufox_pm/webui/) se commitea a proposito, para
+    que instalar no necesite Node. Si editas algo en web/src y no recompilas,
+    publicas una interfaz SIN tu cambio.
+
+      cd web
+      npx tsc --noEmit -p tsconfig.json
+      npx eslint src
+      cd ..
+      python scripts\build_webui.py
+      git add src/camoufox_pm/webui
+
+(b) SI CAMBIAS PYTHON, HAY QUE REINICIAR LA APP
+
+    Los archivos de la interfaz se leen del disco en cada peticion, asi que un
+    manager abierto sirve la pagina NUEVA con el Python VIEJO. La pagina llama a
+    una ruta que el proceso viejo no conoce y falla.
+
+    El error te lo dice: "the running server is older than the page: restart the
+    manager". Cierra la app y vuelve a abrirla.
+
+    Si el acceso directo parece no hacer nada, suele ser un proceso anterior
+    ocupando el puerto 8000. Esto lo despeja:
+
+      Get-Process | Where-Object { $_.ProcessName -like '*camoufox*' } | Stop-Process -Force
+
+(c) NUNCA ESCRIBAS CODIGO CON Set-Content DE POWERSHELL
+
+    Convierte UTF-8 dos veces y destroza acentos, guiones largos y puntos
+    suspensivos. Ya corrompio un archivo fuente una vez. Usa un editor, o Python
+    con encoding="utf-8" explicito.
+
+    Para detectar el dano:   grep -c "â€" archivo.tsx
+
+
+-------------------------------------------------------------------------------
+8. CICLO DE TRABAJO NORMAL
+-------------------------------------------------------------------------------
+
+  git pull                                  (traer lo ultimo)
+  ... editar, con o sin Claude ...
+  uv run --extra dev --extra desktop pytest -q
+  python scripts\build_webui.py             (solo si tocaste web/src)
+  git add -A
+  git commit -F mensaje.txt                 (ver nota abajo)
+  git push origin main
+
+NOTA sobre el mensaje de commit: en PowerShell, las comillas dentro de un
+mensaje con -m rompen el comando. Escribe el mensaje en un archivo y usa -F.
+
+
+-------------------------------------------------------------------------------
+9. TUS PERFILES NO VIAJAN POR GIT
+-------------------------------------------------------------------------------
+
+La carpeta data/ esta ignorada a proposito: ahi estan los perfiles, sus
+fingerprints y los datos de navegacion.
+
+Para llevarlos a la otra PC usa Exportar/Importar desde la interfaz:
+  - Exportar a Excel  -> varios perfiles de una vez
+  - Exportar...       -> uno solo, con cookies y sesion
+
+AVISO: los dos archivos llevan las contrasenas de proxy en TEXTO PLANO, igual
+que la base de datos, porque CPM_SECRET_KEY no esta definida. Tratalos como
+tratarias esas contrasenas.
+
+
+-------------------------------------------------------------------------------
+10. NOTA SOBRE PowerShell
+-------------------------------------------------------------------------------
+
+En PowerShell "curl" NO es curl: es un alias de Invoke-WebRequest y no entiende
+las opciones de curl. Si necesitas curl de verdad, escribe curl.exe
+
+  curl.exe -X POST http://127.0.0.1:8000/api/v1/system/profiles/cleanup
+
+
+===============================================================================
+  Resumen rapido, si ya sabes lo que haces
+===============================================================================
+
+  git clone https://github.com/iamrocan/camoufox-profile-manager.git C:\dev\camoufox
+  cd C:\dev\camoufox
+  python -m pip install --upgrade uv
+  uv sync --extra dev --extra desktop
+  .venv\Scripts\camoufox fetch
+  git config user.name  "iamrocan"
+  git config user.email "60199671+iamrocan@users.noreply.github.com"
+  gh auth login
+  claude
+
+===============================================================================
