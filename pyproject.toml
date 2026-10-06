@@ -40,6 +40,13 @@ dependencies = [
     "psutil>=6.1",
     # socks so a SOCKS5 proxy can be checked, not only HTTP ones.
     "httpx[socks]>=0.28",
+    # zoneinfo has no time zone database of its own on Windows, and a slim
+    # Linux image may not ship one either. proxy_check compares a profile's
+    # zone against the proxy's exit country, and without this it cannot read
+    # an offset: the comparison degrades to a warning on zones that in fact
+    # agree, and a real contradiction can go unreported. It used to arrive as
+    # a transitive dependency, which is why this was never noticed.
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]
