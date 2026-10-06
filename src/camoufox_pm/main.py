@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -195,6 +195,35 @@ def _webui_dir() -> Path | None:
         if candidate and Path(candidate).is_dir():
             return Path(candidate)
     return None
+
+
+# Anything under /api that no router above claimed. Registered after the real
+# routes, so it only sees what they did not match, and before the static mount,
+# so it answers instead of them.
+#
+# Without it the static mount at "/" takes the request, allows only GET and HEAD,
+# and answers a POST with 405 Method Not Allowed -- which reads as "that verb is
+# wrong" when the truth is "this server has never heard of that route". The way
+# that happens in practice: the bundled interface is updated and the server is
+# not restarted, so a page calling a route added in the same commit gets a
+# nonsense error. Say the useful thing instead.
+#
+# OPTIONS is left out so CORS preflight keeps reaching the middleware.
+@app.api_route(
+    "/api/{rest:path}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"],
+    include_in_schema=False,
+)
+async def api_route_not_found(rest: str, request: Request):
+    raise HTTPException(
+        status_code=404,
+        detail=(
+            f"No API route matches {request.method} /api/{rest} on version "
+            f"{__version__}. If this came from the bundled interface, the "
+            "running server is older than the page: restart the manager so it "
+            "loads the current code."
+        ),
+    )
 
 
 # Serve the web UI on the same origin as the API when a build is available;
