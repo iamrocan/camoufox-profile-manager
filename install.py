@@ -442,10 +442,35 @@ Write-Output $link
 # --- summary -----------------------------------------------------------------
 
 
+def manager_is_running() -> bool:
+    """Whether something is already answering on the manager default port.
+
+    A running manager keeps serving the Python it started with while happily
+    serving the *new* interface files off disk, so an update looks applied and
+    then fails on the first call to a route the old process never had. Probed
+    by connecting rather than by listing processes: the port is what decides
+    which code answers.
+    """
+    import socket
+
+    with socket.socket() as probe:
+        probe.settimeout(0.4)
+        try:
+            return probe.connect_ex(("127.0.0.1", 8000)) == 0
+        except OSError:
+            return False
+
+
 def report(target: Path, shortcut: Path | None, git_managed: bool) -> None:
     print("\n" + "=" * 70)
     print("  Instalación terminada")
     print("=" * 70)
+
+    if manager_is_running():
+        print()
+        print("  >> AVISO: el manager ya está abierto, con el código ANTERIOR.")
+        print("     Ciérralo y vuelve a abrirlo, o seguirás viendo la interfaz")
+        print("     nueva hablándole a un servidor viejo.")
 
     print(f"\nCarpeta de la instalación:  {target}")
     print(f"Base de datos de perfiles:  {target / 'data' / 'profiles.db'}")
@@ -473,7 +498,11 @@ def report(target: Path, shortcut: Path | None, git_managed: bool) -> None:
 
     if git_managed:
         print("\nPARA ACTUALIZAR MÁS ADELANTE")
-        print(f"  cd \"{target}\" && git pull && python install.py --no-browser")
+        print("  Cierra el manager primero, luego:")
+        print(f'  cd "{target}"')
+        print("  python install.py --no-browser")
+        print("  Eso trae los cambios y reinstala lo que haga falta. Vuelve a")
+        print("  abrir el manager al terminar: el código se carga al arrancar.")
     else:
         print("\nPARA ACTUALIZAR MÁS ADELANTE")
         print("  Esta copia se descargó como zip y no puede hacer `git pull`.")
