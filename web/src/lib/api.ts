@@ -79,6 +79,7 @@ export interface Profile {
   /** When true the launcher ignores proxy_config and starts the browser direct. */
   proxy_paused?: boolean
   ublock_disabled?: boolean
+  startup_url?: string | null
   storage_path?: string | null
   notes?: string | null
   created_at: string
@@ -269,6 +270,13 @@ export const profilesAPI = {
 
   toggleUblock(id: string): Promise<Profile> {
     return request<Profile>(`${API_PREFIX}/profiles/${id}/ublock/toggle`, { method: 'POST' })
+  },
+
+  setStartupUrl(id: string, url: string | null): Promise<Profile> {
+    return request<Profile>(`${API_PREFIX}/profiles/${id}/startup-url`, {
+      method: 'PUT',
+      body: JSON.stringify({ url }),
+    })
   },
 
   cloneProfile(id: string, newName: string): Promise<Profile> {

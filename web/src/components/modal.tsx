@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 
 import { useT } from '@/lib/i18n'
@@ -125,6 +125,98 @@ export function Modal({ open, title, subtitle, onClose, children, footer, width 
         )}
       </div>
     </div>
+  )
+}
+
+interface PromptProps {
+  open: boolean
+  title: string
+  body?: string
+  label: string
+  placeholder?: string
+  /** What the field starts with; re-applied each time the dialog opens. */
+  initialValue?: string
+  confirmLabel?: string
+  busy?: boolean
+  onSubmit: (value: string) => void
+  onCancel: () => void
+}
+
+/**
+ * Asks for one line of text. Replaces window.prompt, which cannot be styled,
+ * cannot be translated and blocks the whole page.
+ *
+ * Submitting an empty field is allowed on purpose: for a value that can be
+ * unset, clearing the box is the obvious way to say so, and a dialog that
+ * refuses to close until you type something has no way to express it.
+ */
+export function PromptDialog({
+  open,
+  title,
+  body,
+  label,
+  placeholder,
+  initialValue = '',
+  confirmLabel,
+  busy = false,
+  onSubmit,
+  onCancel,
+}: PromptProps) {
+  const t = useT()
+  const [value, setValue] = useState(initialValue)
+
+  useEffect(() => {
+    // The dialog stays mounted between openings, so the field has to be refilled
+    // here; otherwise it would still hold whatever the last profile had in it.
+    // A key would avoid the effect but would also discard what the user typed
+    // whenever the parent rerendered, which polling pages do constantly.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) setValue(initialValue)
+  }, [open, initialValue])
+
+  return (
+    <Modal
+      open={open}
+      title={title}
+      onClose={onCancel}
+      width={460}
+      footer={
+        <>
+          <button type="button" className="btn btn-default" onClick={onCancel}>
+            {t('action.cancel')}
+          </button>
+          <button type="submit" form="prompt-form" className="btn btn-primary" disabled={busy}>
+            {confirmLabel ?? t('modal.confirm')}
+          </button>
+        </>
+      }
+    >
+      <form
+        id="prompt-form"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onSubmit(value.trim())
+        }}
+        className="flex flex-col gap-3"
+      >
+        {body && <p className="text-ink-dim">{body}</p>}
+        <div>
+          <label className="field-label" htmlFor="prompt-input">
+            {label}
+          </label>
+          <input
+            id="prompt-input"
+            className="field font-mono"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder={placeholder}
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+      </form>
+    </Modal>
   )
 }
 

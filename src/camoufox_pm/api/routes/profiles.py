@@ -35,6 +35,7 @@ from camoufox_pm.api.models.profiles import (
     ProxyCheckRequest,
     ProxyCheckResponse,
     ReconcileOsRequest,
+    StartupUrlRequest,
 )
 from camoufox_pm.api.models.system import ApiResponse, ExcelImportData
 from camoufox_pm.core import proxy_check
@@ -818,6 +819,36 @@ async def toggle_profile_proxy(profile_id: str):
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Failed to toggle proxy for profile {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.put(
+    "/profiles/{profile_id}/startup-url",
+    response_model=ProfileResponse,
+    operation_id="set_profile_startup_url",
+    summary="Set or clear the page this profile opens on launch.",
+    description=(
+        "A blank or omitted url clears it, and the profile goes back to opening "
+        "the blank page. A bare host gets https:// put in front of it. Only http "
+        "and https are accepted: this is navigated to automatically on every "
+        "launch, so a javascript: or file: URL would run without anyone "
+        "clicking it. Applies to future launches. 400 if the URL is refused."
+    ),
+)
+async def set_profile_startup_url(profile_id: str, body: StartupUrlRequest):
+    """Set or clear the profile's startup URL."""
+    try:
+        profile_manager = get_profile_manager()
+        updated = await profile_manager.set_startup_url(profile_id, body.url)
+        return ProfileResponse.from_profile(updated)
+    except HTTPException:
+        raise
+    except StaleWriteError:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Failed to set the startup URL for profile {profile_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

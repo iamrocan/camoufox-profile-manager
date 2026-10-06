@@ -216,6 +216,48 @@ class ProxyCheckRecord(BaseModel):
     findings: list[ProxyCheckFinding] = Field(default_factory=list)
 
 
+ALLOWED_STARTUP_SCHEMES = ("http", "https")
+
+
+def normalise_startup_url(raw: str | None) -> str | None:
+    """Clean up a user-supplied startup URL, or refuse it.
+
+    Returns None for anything blank, so clearing the field is just emptying it.
+
+    Only http and https are allowed, and a bare host gets https:// put in front
+    of it because that is what somebody typing "example.com" means. The refusal
+    is the point of the function: this URL is navigated to automatically on
+    every launch, with no click in between, so a javascript: URL would be
+    arbitrary code running in the profile's own session and a file: one would
+    read the disk of whoever launched it.
+    """
+    from urllib.parse import urlparse
+
+    if raw is None:
+        return None
+    url = raw.strip()
+    if not url:
+        return None
+
+    # A bare host or path is the common way to type one; assume the safe scheme
+    # rather than refusing something that was never a scheme to begin with.
+    if "://" not in url:
+        if url.lower().startswith(("javascript:", "data:", "file:", "about:")):
+            raise ValueError(
+                f"{url.split(':', 1)[0]}: URLs are not allowed as a startup page"
+            )
+        url = f"https://{url}"
+
+    parsed = urlparse(url)
+    if parsed.scheme.lower() not in ALLOWED_STARTUP_SCHEMES:
+        raise ValueError(
+            f"A startup URL must be http or https, not {parsed.scheme}:"
+        )
+    if not parsed.netloc:
+        raise ValueError("That does not look like a URL")
+    return url
+
+
 class Profile(BaseModel):
     """Browser profile."""
 
@@ -242,6 +284,13 @@ class Profile(BaseModel):
     # launch, because Firefox loads its addons at startup and Playwright has no
     # way to unload one from a running browser.
     ublock_disabled: bool = False
+
+    # Opened in the first tab on every launch. None means Camoufox's own blank
+    # page, which is what it has always done. Validated on the way in by
+    # normalise_startup_url: this is replayed automatically every time the
+    # profile starts, so the scheme it carries matters more than for a link
+    # somebody has to click.
+    startup_url: str | None = None
     extensions: list[str] = Field(default_factory=list)
     storage_path: str | None = None
     notes: str | None = None

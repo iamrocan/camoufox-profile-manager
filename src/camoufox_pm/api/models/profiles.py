@@ -157,6 +157,13 @@ class ProfileResponse(BaseModel):
             "Toggled from POST /profiles/{id}/ublock/toggle."
         ),
     )
+    startup_url: str | None = Field(
+        None,
+        description=(
+            "Page opened in the first tab on launch. null means the blank page. "
+            "Set from PUT /profiles/{id}/startup-url; http and https only."
+        ),
+    )
     storage_path: str | None
     notes: str | None
     created_at: datetime
@@ -205,6 +212,7 @@ class ProfileResponse(BaseModel):
             proxy_config=profile.proxy.model_dump() if profile.proxy else None,
             proxy_paused=profile.proxy_paused,
             ublock_disabled=profile.ublock_disabled,
+            startup_url=profile.startup_url,
             storage_path=profile.storage_path,
             notes=profile.notes,
             created_at=profile.created_at,
@@ -253,6 +261,19 @@ class ProfileCloneRequest(BaseModel):
         json_schema_extra={
             "example": {"new_name": "Facebook Profile 1 (copy)", "regenerate_fingerprint": True}
         }
+    )
+
+
+class StartupUrlRequest(BaseModel):
+    """Request body for setting the page a profile opens on launch."""
+
+    # Not a pydantic HttpUrl: the point is to accept what somebody types,
+    # including a bare host, and the model layer does the normalising and the
+    # refusing so the same rules apply however the profile is written.
+    url: str | None = Field(None, max_length=2048)
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"url": "https://open.spotify.com"}}
     )
 
 

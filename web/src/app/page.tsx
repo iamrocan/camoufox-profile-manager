@@ -16,6 +16,7 @@ import {
   Pencil,
   Play,
   Plus,
+  House,
   Search,
   Shield,
   ShieldOff,
@@ -26,7 +27,7 @@ import {
 } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
-import { ConfirmDialog, Modal } from '@/components/modal'
+import { ConfirmDialog, Modal, PromptDialog } from '@/components/modal'
 import { ProfileForm } from '@/components/profile-form'
 import { useToast } from '@/components/toast'
 import { useT, type MessageKey } from '@/lib/i18n'
@@ -85,6 +86,8 @@ export default function ProfilesPage() {
     destructive?: boolean
     run: () => Promise<void>
   }>(null)
+  const [startupFor, setStartupFor] = useState<Profile | null>(null)
+  const [savingStartup, setSavingStartup] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
 
   const toast = useToast()
@@ -447,6 +450,30 @@ export default function ProfilesPage() {
       loadProfiles()
     } catch (err) {
       toast('error', t('ublock.toggleFailed'), String(err))
+    }
+  }
+
+  async function saveStartupUrl(value: string) {
+    if (!startupFor) return
+    const profile = startupFor
+    setSavingStartup(true)
+    try {
+      const updated = await profilesAPI.setStartupUrl(profile.id, value || null)
+      toast(
+        'ok',
+        t(updated.startup_url ? 'startup.savedTitle' : 'startup.clearedTitle'),
+        updated.startup_url
+          ? t('startup.savedBody', { url: updated.startup_url })
+          : t('startup.clearedBody', { name: profile.name }),
+      )
+      setStartupFor(null)
+      loadProfiles()
+    } catch (err) {
+      // The dialog stays open: the URL was refused, and closing it would throw
+      // away what the user typed along with the chance to correct it.
+      toast('error', t('startup.failed'), String(err))
+    } finally {
+      setSavingStartup(false)
     }
   }
 
@@ -947,6 +974,18 @@ export default function ProfilesPage() {
                               }}
                             />
                             <MenuItem
+                              icon={<House size={13} />}
+                              label={t(
+                                profile.startup_url
+                                  ? 'action.changeStartupUrl'
+                                  : 'action.setStartupUrl',
+                              )}
+                              onClick={() => {
+                                setStartupFor(profile)
+                                closeMenu(profile.id)
+                              }}
+                            />
+                            <MenuItem
                               icon={<PackageOpen size={13} />}
                               label={t('action.export')}
                               onClick={() => {
@@ -1022,6 +1061,19 @@ export default function ProfilesPage() {
         groups={groups}
         onClose={() => setFormOpen(false)}
         onSaved={loadProfiles}
+      />
+
+      <PromptDialog
+        open={startupFor !== null}
+        title={t('startup.title')}
+        body={t('startup.hint')}
+        label={t('startup.label')}
+        placeholder="https://open.spotify.com"
+        initialValue={startupFor?.startup_url ?? ''}
+        confirmLabel={t('startup.save')}
+        busy={savingStartup}
+        onSubmit={saveStartupUrl}
+        onCancel={() => setStartupFor(null)}
       />
 
       <ConfirmDialog

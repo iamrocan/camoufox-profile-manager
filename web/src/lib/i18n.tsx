@@ -85,6 +85,8 @@ const en = {
   'action.resumeProxy': 'Resume proxy',
   'action.disableUblock': 'Disable uBlock',
   'action.enableUblock': 'Enable uBlock',
+  'action.setStartupUrl': 'Set startup page',
+  'action.changeStartupUrl': 'Change startup page',
   'action.export': 'Export…',
   'action.clearData': 'Clear data',
   'action.delete': 'Delete',
@@ -116,6 +118,18 @@ const en = {
   'ublock.enabledTitle': 'uBlock enabled',
   'ublock.enabledBody': '{name} will open with the ad blocker again from the next launch.',
   'ublock.toggleFailed': 'Could not change the uBlock setting',
+
+  // The page a profile opens on launch
+  'startup.title': 'Startup page',
+  'startup.hint':
+    'Opened in the first tab every time this profile launches. Leave it empty for the blank page.',
+  'startup.label': 'Address',
+  'startup.save': 'Save',
+  'startup.savedTitle': 'Startup page set',
+  'startup.savedBody': 'Opens {url} from the next launch.',
+  'startup.clearedTitle': 'Startup page cleared',
+  'startup.clearedBody': '{name} will open the blank page again.',
+  'startup.failed': 'Could not set the startup page',
 
   // Clear data
   'clear.title': 'Clear browser data',
@@ -570,6 +584,8 @@ const es: Record<MessageKey, string> = {
   'action.resumeProxy': 'Reanudar proxy',
   'action.disableUblock': 'Desactivar uBlock',
   'action.enableUblock': 'Activar uBlock',
+  'action.setStartupUrl': 'Definir página de inicio',
+  'action.changeStartupUrl': 'Cambiar página de inicio',
   'action.export': 'Exportar…',
   'action.clearData': 'Limpiar datos',
   'action.delete': 'Eliminar',
@@ -600,6 +616,17 @@ const es: Record<MessageKey, string> = {
   'ublock.enabledBody':
     '{name} volverá a abrirse con el bloqueador de anuncios desde el próximo inicio.',
   'ublock.toggleFailed': 'No se pudo cambiar el ajuste de uBlock',
+
+  'startup.title': 'Página de inicio',
+  'startup.hint':
+    'Se abre en la primera pestaña cada vez que arranca este perfil. Déjalo vacío para la página en blanco.',
+  'startup.label': 'Dirección',
+  'startup.save': 'Guardar',
+  'startup.savedTitle': 'Página de inicio definida',
+  'startup.savedBody': 'Abrirá {url} desde el próximo inicio.',
+  'startup.clearedTitle': 'Página de inicio quitada',
+  'startup.clearedBody': '{name} volverá a abrir la página en blanco.',
+  'startup.failed': 'No se pudo definir la página de inicio',
 
   'clear.title': 'Limpiar datos del navegador',
   'clear.body':

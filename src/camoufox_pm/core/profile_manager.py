@@ -24,6 +24,7 @@ from .models import (
     ProfileStatus,
     UsageStats,
     generate_profile_id,
+    normalise_startup_url,
 )
 
 
@@ -1129,6 +1130,13 @@ class ProfileManager:
             session = await self.browser_sessions.launch(
                 profile_id, options, on_exit=self._on_browser_exit
             )
+            if profile.startup_url:
+                # Fire and forget. The browser is already usable, and a slow
+                # site -- or a proxy that is answering slowly today -- must not
+                # hold up the response that tells the UI the launch worked.
+                asyncio.create_task(
+                    self._open_startup_url(profile_id, session, profile.startup_url)
+                )
         except (Exception, asyncio.CancelledError):
             # CancelledError is a BaseException, not an Exception: an HTTP client
             # that disconnects mid-launch cancels this coroutine, and a lease must
@@ -1150,6 +1158,61 @@ class ProfileManager:
             "process_id": session.process_id,
             "camoufox_options": {"process_id": session.process_id, "options": options},
         }
+
+    async def _open_startup_url(self, profile_id: str, session: Any, url: str) -> None:
+        """Point the first tab at the profile's startup URL.
+
+        Firefox's own homepage preference does not work here: Playwright opens
+        about:blank regardless, because it drives startup below the layer prefs
+        act on -- measured, not assumed. Navigating the page it opened is the
+        way that does work.
+
+        Every failure is swallowed deliberately. The browser has launched; a
+        site that is down, a proxy that is refusing, or a window the user closed
+        in the first second are all ordinary, and none of them is a reason to
+        report the launch as failed after the fact.
+        """
+        try:
+            context = session.camoufox
+            browser = getattr(context, "browser", None) or context
+            pages = getattr(browser, "pages", None)
+            page = pages[0] if pages else await browser.new_page()
+            # "commit" returns as soon as the response starts arriving rather
+            # than when the page finishes loading, so a heavy page does not keep
+            # this task alive long after the tab is already showing it.
+            await page.goto(url, wait_until="commit", timeout=30000)
+            logger.info(f"Opened startup URL for {profile_id}: {url}")
+        except Exception as exc:  # noqa: BLE001 - never escalate past the launch
+            logger.warning(f"Could not open the startup URL for {profile_id}: {exc}")
+
+    async def set_startup_url(self, profile_id: str, url: str | None) -> Profile:
+        """Set or clear the page a profile opens on launch.
+
+        Validated here rather than at the edge so the same rules apply to the
+        API, a script and an import. Takes effect on the next launch.
+        """
+        profile = await self.get_profile(profile_id)
+        if not profile:
+            raise ValueError(f"Profile with ID {profile_id} not found")
+
+        cleaned = normalise_startup_url(url)
+        if profile.startup_url == cleaned:
+            return profile  # no-op, no bump
+
+        profile.startup_url = cleaned
+        profile.updated_at = datetime.now()
+        await self.storage.update_profile(profile, expected_row_version=profile.row_version)
+
+        await self.storage.log_usage(
+            UsageStats(
+                profile_id=profile_id,
+                action="startup_url_set" if cleaned else "startup_url_cleared",
+            )
+        )
+        logger.info(
+            f"Startup URL {'set to ' + cleaned if cleaned else 'cleared'} for {profile_id}"
+        )
+        return profile
 
     async def _on_browser_exit(self, profile_id: str) -> None:
         """Record usage when a browser exits on its own (e.g. the user closes it)."""

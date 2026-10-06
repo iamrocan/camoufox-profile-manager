@@ -109,6 +109,9 @@ class DatabaseManager:
                 # Camoufox would otherwise load. Existing rows default to 0,
                 # which is the behaviour they already had.
                 ("ublock_disabled", "INTEGER NOT NULL DEFAULT 0"),
+                # Page opened in the first tab on launch. NULL keeps the blank
+                # page every existing profile already opened.
+                ("startup_url", "TEXT"),
             ],
         }
         for table, columns in added_columns.items():
@@ -267,6 +270,7 @@ class DatabaseManager:
             profile.proxy_check.model_dump_json() if profile.proxy_check else None,
             1 if profile.proxy_paused else 0,
             1 if profile.ublock_disabled else 0,
+            profile.startup_url,
         )
 
     def _upsert_profile(self, profile: Profile) -> None:
@@ -283,8 +287,9 @@ class DatabaseManager:
             INSERT INTO profiles (
                 id, name, group_id, status, browser_settings, proxy_config,
                 extensions, storage_path, notes, created_at, updated_at, last_used,
-                fingerprint, proxy_check, proxy_paused, ublock_disabled
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                fingerprint, proxy_check, proxy_paused, ublock_disabled,
+                startup_url
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 group_id = excluded.group_id,
@@ -300,7 +305,8 @@ class DatabaseManager:
                 fingerprint = excluded.fingerprint,
                 proxy_check = excluded.proxy_check,
                 proxy_paused = excluded.proxy_paused,
-                ublock_disabled = excluded.ublock_disabled
+                ublock_disabled = excluded.ublock_disabled,
+                startup_url = excluded.startup_url
         """,
             self._profile_columns(profile),
         )
@@ -339,7 +345,7 @@ class DatabaseManager:
                 proxy_config = ?, extensions = ?, storage_path = ?, notes = ?,
                 created_at = ?, updated_at = ?, last_used = ?, fingerprint = ?,
                 proxy_check = ?, proxy_paused = ?, ublock_disabled = ?,
-                row_version = row_version + 1
+                startup_url = ?, row_version = row_version + 1
             WHERE id = ? AND row_version = ?
             """,
             (*self._profile_columns(profile)[1:], profile.id, expected_row_version),
@@ -964,6 +970,7 @@ class DatabaseManager:
             proxy=proxy,
             proxy_paused=proxy_paused,
             ublock_disabled=ublock_disabled,
+            startup_url=row["startup_url"] if "startup_url" in keys else None,
             extensions=extensions,
             storage_path=row["storage_path"],
             notes=row["notes"],
