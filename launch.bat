@@ -8,9 +8,9 @@ cd /d "%REPO_DIR%"
 echo [launch.bat] REPO_DIR=%REPO_DIR%
 echo [launch.bat] CPM_DB_PATH=%CPM_DB_PATH%
 echo.
-REM Call the venv entry point directly. We DO NOT use `uv run` because it
-REM re-syncs from pyproject.toml, which replaces the release wheel (that
-REM ships the compiled Next.js UI) with an editable install missing the UI.
+REM Call the venv entry point directly. We DO NOT use `uv run`: it re-resolves
+REM the environment on every launch, which costs seconds of startup and fails
+REM outright with no network. The venv entry point needs neither.
 "%REPO_DIR%\.venv\Scripts\camoufox-pm.exe" --desktop
 echo.
 echo [launch.bat] Exit code: %ERRORLEVEL%

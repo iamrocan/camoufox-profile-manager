@@ -2,9 +2,9 @@
 ' Runs the venv entry point directly, from the repo directory,
 ' with CPM_DB_PATH pinned to an absolute path inside the repo.
 '
-' We DO NOT use `uv run` here: `uv run` re-syncs from pyproject.toml
-' every launch, which replaces the release wheel (that ships the
-' compiled Next.js UI) with an editable install missing the UI.
+' We DO NOT use `uv run` here: it re-resolves the environment on every
+' launch, which costs seconds before the window appears and would fail
+' outright with no network. The venv entry point needs neither.
 
 Option Explicit
 

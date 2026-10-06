@@ -12,3 +12,9 @@
 *.toml  text diff
 *.yml   text diff
 *.yaml  text diff
+
+# The committed UI bundle is build output, not source. Checked out exactly as
+# committed: nobody edits or diffs it by hand, and rewriting line endings in
+# generated chunks makes every rebuild look like a change to files that only
+# differ by their endings.
+src/camoufox_pm/webui/** -text

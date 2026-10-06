@@ -265,8 +265,12 @@ config.ini
 # Ruff cache
 .ruff_cache/
 
-# Generated web UI bundle (built by scripts/build_webui.py)
-src/camoufox_pm/webui/
+# The built web UI bundle (scripts/build_webui.py) IS committed in this fork.
+# Upstream ignores it because it publishes release wheels that carry it; this
+# fork is installed by cloning, so a clone without it serves the API and no
+# interface at all — and rebuilding it needs Node, which defeats the point of
+# an install that only wants Python. 1.3 MB, and install.py verifies it is
+# there. Rebuild and commit it whenever anything under web/src changes.
 
 # Keep the committed PyInstaller spec
 !packaging/*.spec
