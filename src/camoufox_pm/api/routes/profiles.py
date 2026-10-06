@@ -822,6 +822,40 @@ async def toggle_profile_proxy(profile_id: str):
 
 
 @router.post(
+    "/profiles/{profile_id}/ublock/toggle",
+    response_model=ProfileResponse,
+    operation_id="toggle_profile_ublock",
+    summary="Turn the uBlock Origin addon on or off for this profile.",
+    description=(
+        "Flips the ublock_disabled flag. Camoufox loads uBlock Origin unless "
+        "told otherwise, so when true the next launch excludes it. Applies to "
+        "future launches only: Firefox loads addons at startup and a running "
+        "browser cannot have one unloaded. Returns the updated profile."
+    ),
+)
+async def toggle_profile_ublock(profile_id: str):
+    """Toggle whether the next launch loads uBlock Origin."""
+    try:
+        profile_manager = get_profile_manager()
+        profile = await profile_manager.get_profile(profile_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail=f"Profile with ID {profile_id} not found")
+        updated = await profile_manager.set_ublock_disabled(
+            profile_id, not profile.ublock_disabled
+        )
+        return ProfileResponse.from_profile(updated)
+    except HTTPException:
+        raise
+    except StaleWriteError:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Failed to toggle uBlock for profile {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post(
     "/profiles/{profile_id}/clear-data",
     operation_id="clear_profile_data",
     summary="Clear a profile's browser data.",

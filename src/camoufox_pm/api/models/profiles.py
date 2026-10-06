@@ -149,6 +149,14 @@ class ProfileResponse(BaseModel):
             "even if proxy_config is set. Toggled from POST /profiles/{id}/proxy/toggle."
         ),
     )
+    ublock_disabled: bool = Field(
+        False,
+        description=(
+            "When true the next launch excludes the uBlock Origin addon that "
+            "Camoufox loads by default. Applies to future launches only. "
+            "Toggled from POST /profiles/{id}/ublock/toggle."
+        ),
+    )
     storage_path: str | None
     notes: str | None
     created_at: datetime
@@ -196,6 +204,7 @@ class ProfileResponse(BaseModel):
             ),
             proxy_config=profile.proxy.model_dump() if profile.proxy else None,
             proxy_paused=profile.proxy_paused,
+            ublock_disabled=profile.ublock_disabled,
             storage_path=profile.storage_path,
             notes=profile.notes,
             created_at=profile.created_at,

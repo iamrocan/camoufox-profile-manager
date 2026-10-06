@@ -83,6 +83,8 @@ const en = {
   'action.checkProxy': 'Check proxy',
   'action.pauseProxy': 'Pause proxy',
   'action.resumeProxy': 'Resume proxy',
+  'action.disableUblock': 'Disable uBlock',
+  'action.enableUblock': 'Enable uBlock',
   'action.export': 'Export…',
   'action.clearData': 'Clear data',
   'action.delete': 'Delete',
@@ -107,6 +109,13 @@ const en = {
   'proxy.toggleFailed': 'Could not toggle proxy',
   'proxy.pausedHint':
     'Proxy paused: the next launch will not use it. Toggle from the row menu.',
+
+  // uBlock Origin, which Camoufox loads unless a profile says otherwise
+  'ublock.disabledTitle': 'uBlock disabled',
+  'ublock.disabledBody': '{name} will open without the ad blocker from the next launch.',
+  'ublock.enabledTitle': 'uBlock enabled',
+  'ublock.enabledBody': '{name} will open with the ad blocker again from the next launch.',
+  'ublock.toggleFailed': 'Could not change the uBlock setting',
 
   // Clear data
   'clear.title': 'Clear browser data',
@@ -559,6 +568,8 @@ const es: Record<MessageKey, string> = {
   'action.checkProxy': 'Probar proxy',
   'action.pauseProxy': 'Pausar proxy',
   'action.resumeProxy': 'Reanudar proxy',
+  'action.disableUblock': 'Desactivar uBlock',
+  'action.enableUblock': 'Activar uBlock',
   'action.export': 'Exportar…',
   'action.clearData': 'Limpiar datos',
   'action.delete': 'Eliminar',
@@ -581,6 +592,14 @@ const es: Record<MessageKey, string> = {
   'proxy.toggleFailed': 'No se pudo cambiar el proxy',
   'proxy.pausedHint':
     'Proxy pausado: el próximo inicio no lo usará. Cámbialo desde el menú de la fila.',
+
+  'ublock.disabledTitle': 'uBlock desactivado',
+  'ublock.disabledBody':
+    '{name} se abrirá sin el bloqueador de anuncios desde el próximo inicio.',
+  'ublock.enabledTitle': 'uBlock activado',
+  'ublock.enabledBody':
+    '{name} volverá a abrirse con el bloqueador de anuncios desde el próximo inicio.',
+  'ublock.toggleFailed': 'No se pudo cambiar el ajuste de uBlock',
 
   'clear.title': 'Limpiar datos del navegador',
   'clear.body':

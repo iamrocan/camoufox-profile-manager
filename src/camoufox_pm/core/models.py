@@ -235,6 +235,13 @@ class Profile(BaseModel):
     # Set from the UI's "Pause proxy" menu item; the proxy_config itself is
     # kept so "Resume proxy" is a one-click put-back.
     proxy_paused: bool = False
+
+    # Camoufox ships uBlock Origin and loads it unless told otherwise, so the
+    # flag is the negative one and an existing profile keeps what it had.
+    # Set from the UI's "Disable uBlock" menu item; takes effect on the next
+    # launch, because Firefox loads its addons at startup and Playwright has no
+    # way to unload one from a running browser.
+    ublock_disabled: bool = False
     extensions: list[str] = Field(default_factory=list)
     storage_path: str | None = None
     notes: str | None = None
@@ -301,6 +308,16 @@ class Profile(BaseModel):
             options["window"] = (bs.window_width, bs.window_height)
         if bs.fonts:
             options["fonts"] = bs.fonts
+        if self.ublock_disabled:
+            # Imported here rather than at module scope: these models are also
+            # used by tooling that has no camoufox installed, and a missing
+            # addon is not a reason to fail to describe a profile.
+            try:
+                from camoufox import DefaultAddons
+
+                options["exclude_addons"] = [DefaultAddons.UBO]
+            except ImportError:  # pragma: no cover - only without camoufox
+                pass
         if self.proxy and not self.proxy_paused:
             options["proxy"] = self.proxy.to_camoufox_format()
         elif self.proxy and self.proxy_paused:

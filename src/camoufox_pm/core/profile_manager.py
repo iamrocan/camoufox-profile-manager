@@ -795,6 +795,43 @@ class ProfileManager:
         )
         return profile
 
+    async def set_ublock_disabled(self, profile_id: str, disabled: bool) -> Profile:
+        """Toggle whether the next launch loads the uBlock Origin addon.
+
+        Camoufox loads it unless told otherwise, so this adds exclude_addons
+        rather than adding an addon. Only affects *future* launches: Firefox
+        loads its addons at startup and Playwright cannot unload one from a
+        running browser, so unlike the proxy there is no live half to flip.
+
+        Worth knowing before turning it off: a browser with no content blocker
+        is the commoner configuration, and uBlock is itself detectable -- it
+        changes what a page can see. Neither answer is the private one, so the
+        choice belongs per profile rather than in a global setting.
+        """
+        profile = await self.get_profile(profile_id)
+        if not profile:
+            raise ValueError(f"Profile with ID {profile_id} not found")
+
+        if profile.ublock_disabled == disabled:
+            return profile  # no-op, no bump
+
+        profile.ublock_disabled = disabled
+        profile.updated_at = datetime.now()
+        # Version-checked, same rationale as set_proxy_paused above.
+        await self.storage.update_profile(profile, expected_row_version=profile.row_version)
+
+        await self.storage.log_usage(
+            UsageStats(
+                profile_id=profile_id,
+                action="ublock_disabled" if disabled else "ublock_enabled",
+            )
+        )
+        logger.info(
+            f"uBlock {'disabled' if disabled else 'enabled'} for profile {profile_id} "
+            "(applies on the next launch)"
+        )
+        return profile
+
     async def clear_profile_data(self, profile_id: str) -> dict[str, Any]:
         """Wipe a profile's browser data (cookies, cache, history, storage,
         session, downloads, ...) while leaving the profile's identity intact.

@@ -17,6 +17,8 @@ import {
   Play,
   Plus,
   Search,
+  Shield,
+  ShieldOff,
   Square,
   Trash2,
   Upload,
@@ -429,6 +431,22 @@ export default function ProfilesPage() {
       loadProfiles()
     } catch (err) {
       toast('error', t('proxy.toggleFailed'), String(err))
+    }
+  }
+
+  async function toggleUblock(profile: Profile) {
+    try {
+      const updated = await profilesAPI.toggleUblock(profile.id)
+      toast(
+        'ok',
+        t(updated.ublock_disabled ? 'ublock.disabledTitle' : 'ublock.enabledTitle'),
+        t(updated.ublock_disabled ? 'ublock.disabledBody' : 'ublock.enabledBody', {
+          name: profile.name,
+        }),
+      )
+      loadProfiles()
+    } catch (err) {
+      toast('error', t('ublock.toggleFailed'), String(err))
     }
   }
 
@@ -910,6 +928,24 @@ export default function ProfilesPage() {
                                 }}
                               />
                             ) : null}
+                            <MenuItem
+                              icon={
+                                profile.ublock_disabled ? (
+                                  <Shield size={13} />
+                                ) : (
+                                  <ShieldOff size={13} />
+                                )
+                              }
+                              label={t(
+                                profile.ublock_disabled
+                                  ? 'action.enableUblock'
+                                  : 'action.disableUblock',
+                              )}
+                              onClick={() => {
+                                toggleUblock(profile)
+                                closeMenu(profile.id)
+                              }}
+                            />
                             <MenuItem
                               icon={<PackageOpen size={13} />}
                               label={t('action.export')}
