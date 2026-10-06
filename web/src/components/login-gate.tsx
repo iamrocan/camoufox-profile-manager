@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 import { authAPI, type AuthSession } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 
 interface AuthState {
   /** The logged-in user, or null when login is off or not yet established. */
@@ -65,6 +66,7 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
 }
 
 function LoginScreen({ onLoggedIn }: { onLoggedIn: (session: AuthSession) => void }) {
+  const t = useT()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -87,9 +89,9 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: (session: AuthSession) => voi
   return (
     <div className="flex h-screen items-center justify-center">
       <form onSubmit={submit} className="panel flex w-[300px] flex-col gap-3 p-5">
-        <h1 className="text-[14px] font-semibold">Sign in</h1>
+        <h1 className="text-[14px] font-semibold">{t('login.title')}</h1>
         <label className="flex flex-col gap-1">
-          <span className="text-ink-dim">Username</span>
+          <span className="text-ink-dim">{t('login.username')}</span>
           <input
             className="field"
             value={username}
@@ -99,7 +101,7 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: (session: AuthSession) => voi
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-ink-dim">Password</span>
+          <span className="text-ink-dim">{t('login.password')}</span>
           <input
             type="password"
             className="field"
@@ -110,7 +112,7 @@ function LoginScreen({ onLoggedIn }: { onLoggedIn: (session: AuthSession) => voi
         </label>
         {error && <p className="text-danger">{error}</p>}
         <button type="submit" className="btn btn-primary" disabled={busy || !username || !password}>
-          {busy ? 'Signing in…' : 'Sign in'}
+          {t(busy ? 'login.busy' : 'login.submit')}
         </button>
       </form>
     </div>

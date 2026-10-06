@@ -27,7 +27,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ConfirmDialog, Modal } from '@/components/modal'
 import { ProfileForm } from '@/components/profile-form'
 import { useToast } from '@/components/toast'
-import { useT } from '@/lib/i18n'
+import { useT, type MessageKey } from '@/lib/i18n'
 import {
   browsersAPI,
   formatLastUsed,
@@ -44,13 +44,13 @@ import {
 
 type SortKey = 'name' | 'id' | 'group' | 'os' | 'status' | 'last_used'
 
-const COLUMNS: { key: SortKey; label: string; className?: string }[] = [
-  { key: 'name', label: 'Name' },
-  { key: 'id', label: 'ID' },
-  { key: 'group', label: 'Group' },
-  { key: 'os', label: 'OS' },
-  { key: 'status', label: 'Status' },
-  { key: 'last_used', label: 'Last used' },
+const COLUMNS: { key: SortKey; label: MessageKey; className?: string }[] = [
+  { key: 'name', label: 'col.name' },
+  { key: 'id', label: 'col.id' },
+  { key: 'group', label: 'col.group' },
+  { key: 'os', label: 'col.os' },
+  { key: 'status', label: 'col.status' },
+  { key: 'last_used', label: 'col.lastUsed' },
 ]
 
 export default function ProfilesPage() {
@@ -77,6 +77,10 @@ export default function ProfilesPage() {
     title: string
     body: string
     label: string
+    // Says outright whether the action destroys something, rather than being
+    // inferred by comparing the label against "Delete" — which stopped being
+    // true the moment the label could be translated.
+    destructive?: boolean
     run: () => Promise<void>
   }>(null)
   const [exportOpen, setExportOpen] = useState(false)
@@ -252,7 +256,7 @@ export default function ProfilesPage() {
         await profilesAPI.startProfile(profile.id)
         await Promise.all([loadRunning(), loadProfiles()])
       } catch (err) {
-        toast('error', 'Could not launch browser', String(err))
+        toast('error', t('toast.launchFailed'), String(err))
       }
     })
   }
@@ -263,7 +267,7 @@ export default function ProfilesPage() {
         await profilesAPI.closeProfile(profile.id)
         await loadRunning()
       } catch (err) {
-        toast('error', 'Could not close browser', String(err))
+        toast('error', t('toast.closeFailed'), String(err))
       }
     })
   }
@@ -280,18 +284,14 @@ export default function ProfilesPage() {
   }
 
   async function exportArchive(profile: Profile) {
-    toast('info', 'Packing the profile…', 'Cookies and history make this take a moment.')
+    toast('info', t('toast.packing'), t('toast.packingBody'))
     try {
       const blob = await profilesAPI.exportArchive(profile.id)
       const safe = profile.name.replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^-|-$/g, '')
       download(blob, `${safe || profile.id}.camoufox.zip`)
-      toast(
-        'ok',
-        'Profile exported',
-        'The archive holds session cookies and the proxy password — keep it like a password.',
-      )
+      toast('ok', t('toast.exported'), t('toast.exportedBody'))
     } catch (err) {
-      toast('error', 'Could not export the profile', String(err))
+      toast('error', t('toast.exportFailed'), String(err))
     }
   }
 
@@ -301,20 +301,20 @@ export default function ProfilesPage() {
     if (!file) return
     try {
       const profile = await profilesAPI.importArchive(file)
-      toast('ok', 'Profile imported', profile.name)
+      toast('ok', t('toast.imported'), profile.name)
       loadProfiles()
     } catch (err) {
-      toast('error', 'Could not import the profile', String(err))
+      toast('error', t('toast.importFailed'), String(err))
     }
   }
 
   async function clone(profile: Profile) {
     try {
       await profilesAPI.cloneProfile(profile.id, `${profile.name} copy`)
-      toast('ok', 'Profile cloned', `${profile.name} copy`)
+      toast('ok', t('toast.cloned'), `${profile.name} copy`)
       loadProfiles()
     } catch (err) {
-      toast('error', 'Could not clone profile', String(err))
+      toast('error', t('toast.cloneFailed'), String(err))
     }
   }
 
@@ -345,7 +345,7 @@ export default function ProfilesPage() {
       )
       return record
     } catch (err) {
-      toast('error', 'Could not check the proxy', String(err))
+      toast('error', t('toast.checkFailed'), String(err))
       return null
     } finally {
       setCheckingProxies((current) => {
@@ -379,7 +379,7 @@ export default function ProfilesPage() {
       for (let next = queue.shift(); next; next = queue.shift()) {
         const record = await checkProxy(next)
         if (!record) unchecked += 1
-        else if (readProxyCheck(record).tone === 'ok') clean += 1
+        else if (readProxyCheck(record, t).tone === 'ok') clean += 1
         else flagged += 1
       }
     })
@@ -399,12 +399,13 @@ export default function ProfilesPage() {
 
   function askDelete(profile: Profile) {
     setConfirm({
-      title: 'Delete profile',
-      body: `"${profile.name}" and its browser data will be removed. This cannot be undone.`,
-      label: 'Delete',
+      title: t('delete.title'),
+      body: t('delete.body', { name: profile.name }),
+      label: t('action.delete'),
+      destructive: true,
       run: async () => {
         await profilesAPI.deleteProfile(profile.id)
-        toast('ok', 'Profile deleted', profile.name)
+        toast('ok', t('delete.done'), profile.name)
         setSelected((current) => {
           const next = new Set(current)
           next.delete(profile.id)
@@ -456,12 +457,13 @@ export default function ProfilesPage() {
   function askBulkDelete() {
     const count = selected.size
     setConfirm({
-      title: `Delete ${count} profile${count === 1 ? '' : 's'}`,
-      body: 'The selected profiles and their browser data will be removed. This cannot be undone.',
-      label: 'Delete',
+      title: t('bulk.deleteTitle', { count }),
+      body: t('bulk.deleteBody'),
+      label: t('action.delete'),
+      destructive: true,
       run: async () => {
         for (const id of selected) await profilesAPI.deleteProfile(id)
-        toast('ok', `Deleted ${count} profile${count === 1 ? '' : 's'}`)
+        toast('ok', t('bulk.deleteDone', { count }))
         setSelected(new Set())
         loadProfiles()
       },
@@ -477,15 +479,12 @@ export default function ProfilesPage() {
   function askClearGeography() {
     const ids = profiles.filter((p) => selected.has(p.id) && hasGeography(p)).map((p) => p.id)
     setConfirm({
-      title: `Clear geography of ${ids.length} profile${ids.length === 1 ? '' : 's'}`,
-      body:
-        'The stored timezone and coordinates are unset, so Camoufox derives both — and the ' +
-        'WebRTC address — from where each profile\'s proxy comes out, as a profile created ' +
-        'today does. Languages and the pinned machine are untouched.',
-      label: 'Clear',
+      title: t('bulk.geoTitle', { count: ids.length }),
+      body: t('bulk.geoBody'),
+      label: t('bulk.geoConfirm'),
       run: async () => {
         const result = await profilesAPI.clearGeography(ids)
-        toast('ok', `Cleared ${result.cleared.length} profile${result.cleared.length === 1 ? '' : 's'}`)
+        toast('ok', t('bulk.geoDone', { count: result.cleared.length }))
         setSelected(new Set())
         loadProfiles()
       },
@@ -494,9 +493,9 @@ export default function ProfilesPage() {
 
   function askCloseAll() {
     setConfirm({
-      title: 'Close all browsers',
-      body: `${running.size} running browser${running.size === 1 ? '' : 's'} will be closed.`,
-      label: 'Close all',
+      title: t('bulk.closeAllTitle'),
+      body: t('bulk.closeAllBody', { count: running.size }),
+      label: t('bulk.closeAllConfirm'),
       run: async () => {
         const result = await browsersAPI.closeAll()
         toast('ok', result.message)
@@ -528,9 +527,9 @@ export default function ProfilesPage() {
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
-      toast('ok', 'Exported to camoufox-profiles.xlsx', 'The file contains proxy passwords in clear text.')
+      toast('ok', t('excel.exported'), t('excel.exportedBody'))
     } catch (err) {
-      toast('error', 'Export failed', String(err))
+      toast('error', t('excel.exportFailed'), String(err))
     }
   }
 
@@ -541,24 +540,24 @@ export default function ProfilesPage() {
     try {
       const result = await profilesAPI.importExcel(file)
       if (result.success) {
-        toast('ok', `Imported ${result.data?.created_count ?? 0} profiles`)
+        toast('ok', t('excel.imported', { count: result.data?.created_count ?? 0 }))
         loadProfiles()
       } else {
         toast(
           'error',
-          'Import finished with errors',
+          t('excel.importErrors'),
           (result.data?.errors ?? []).slice(0, 3).join('\n') || result.message,
         )
       }
     } catch (err) {
-      toast('error', 'Import failed', String(err))
+      toast('error', t('excel.importFailed'), String(err))
     }
   }
 
   return (
     <>
       <header className="sticky top-0 z-20 flex h-[52px] items-center gap-3 border-b border-line bg-canvas/85 px-5 backdrop-blur">
-        <h1 className="text-[14px] font-semibold">Profiles</h1>
+        <h1 className="text-[14px] font-semibold">{t('profiles.title')}</h1>
         <span className="font-mono text-ink-faint">{visible.length}</span>
 
         <div className="relative ml-3 w-[240px]">
@@ -645,7 +644,7 @@ export default function ProfilesPage() {
 
       {selected.size > 0 && (
         <div className="flex items-center gap-3 border-b border-line bg-raised px-5 py-2">
-          <span>{selected.size} selected</span>
+          <span>{t('bulk.selected', { count: selected.size })}</span>
           {selectedWithProxy > 0 && (
             <button
               className="btn btn-default h-7"
@@ -654,22 +653,22 @@ export default function ProfilesPage() {
             >
               <Globe size={13} />
               {checkingProxies.size > 0
-                ? `Checking… (${checkingProxies.size})`
-                : `Check proxies (${selectedWithProxy})`}
+                ? t('bulk.checking', { count: checkingProxies.size })
+                : t('bulk.checkProxies', { count: selectedWithProxy })}
             </button>
           )}
           {selectedWithGeography > 0 && (
             <button className="btn btn-default h-7" onClick={askClearGeography}>
               <Globe size={13} />
-              Clear geography ({selectedWithGeography})
+              {t('bulk.clearGeography', { count: selectedWithGeography })}
             </button>
           )}
           <button className="btn btn-danger h-7" onClick={askBulkDelete}>
             <Trash2 size={13} />
-            Delete
+            {t('action.delete')}
           </button>
           <button className="btn btn-ghost h-7" onClick={() => setSelected(new Set())}>
-            Clear
+            {t('bulk.clearSelection')}
           </button>
         </div>
       )}
@@ -677,21 +676,21 @@ export default function ProfilesPage() {
       {error ? (
         <EmptyState
           icon={<Users size={18} />}
-          title="Cannot reach the API"
+          title={t('empty.apiTitle')}
           body={error}
           action={
             <button className="btn btn-default" onClick={loadProfiles}>
-              Retry
+              {t('empty.retry')}
             </button>
           }
         />
       ) : loading ? (
-        <p className="px-5 py-8 text-ink-faint">Loading…</p>
+        <p className="px-5 py-8 text-ink-faint">{t('profiles.loading')}</p>
       ) : profiles.length === 0 ? (
         <EmptyState
           icon={<Users size={18} />}
-          title="No profiles yet"
-          body="A profile is one isolated browser identity — its own fingerprint, proxy, cookies and storage. Create one to get started."
+          title={t('empty.noneTitle')}
+          body={t('empty.noneBody')}
           action={
             <button
               className="btn btn-primary"
@@ -701,15 +700,15 @@ export default function ProfilesPage() {
               }}
             >
               <Plus size={14} strokeWidth={2.5} />
-              Create your first profile
+              {t('empty.createFirst')}
             </button>
           }
         />
       ) : visible.length === 0 ? (
         <EmptyState
           icon={<Search size={18} />}
-          title="No matches"
-          body="No profile matches the current search and filter."
+          title={t('empty.noMatchTitle')}
+          body={t('empty.noMatchBody')}
           action={
             <button
               className="btn btn-default"
@@ -718,7 +717,7 @@ export default function ProfilesPage() {
                 setStatusFilter('all')
               }}
             >
-              Clear filters
+              {t('empty.clearFilters')}
             </button>
           }
         />
@@ -749,13 +748,13 @@ export default function ProfilesPage() {
                     className="inline-flex items-center gap-1 hover:text-ink"
                     onClick={() => toggleSort(column.key)}
                   >
-                    {column.label}
+                    {t(column.label)}
                     {sortKey === column.key &&
                       (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
                   </button>
                 </th>
               ))}
-              <th className="py-2 pr-4 font-medium">Proxy</th>
+              <th className="py-2 pr-4 font-medium">{t('col.proxy')}</th>
               <th className="w-[104px] py-2 pr-5" />
             </tr>
           </thead>
@@ -801,7 +800,7 @@ export default function ProfilesPage() {
                   <td className="py-2.5 pr-4">
                     <StatusCell status={profile.status} running={isRunning} />
                   </td>
-                  <td className="py-2.5 pr-4 text-ink-dim">{formatLastUsed(profile.last_used)}</td>
+                  <td className="py-2.5 pr-4 text-ink-dim">{formatLastUsed(profile.last_used, t)}</td>
                   <td className="py-2.5 pr-4">
                     <ProxyCell
                       profile={profile}
@@ -819,12 +818,12 @@ export default function ProfilesPage() {
                         {isRunning ? (
                           <>
                             <Square size={11} fill="currentColor" />
-                            Stop
+                            {t('action.stop')}
                           </>
                         ) : (
                           <>
                             <Play size={11} fill="currentColor" />
-                            Run
+                            {t('action.run')}
                           </>
                         )}
                       </button>
@@ -832,7 +831,7 @@ export default function ProfilesPage() {
                       <div className="relative">
                         <button
                           className="btn btn-ghost h-7 w-7 p-0"
-                          aria-label={`Actions for ${profile.name}`}
+                          aria-label={t('profiles.actionsFor', { name: profile.name })}
                           aria-haspopup="menu"
                           aria-expanded={menuFor === profile.id}
                           data-menu-trigger={profile.id}
@@ -951,15 +950,18 @@ export default function ProfilesPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-5 py-3 text-ink-dim">
           <span>
-            {(currentPage - 1) * perPage + 1}–{Math.min(currentPage * perPage, visible.length)} of{' '}
-            {visible.length}
+            {t('page.range', {
+              from: (currentPage - 1) * perPage + 1,
+              to: Math.min(currentPage * perPage, visible.length),
+              total: visible.length,
+            })}
           </span>
           <div className="flex items-center gap-1">
             <button
               className="btn btn-ghost h-7 w-7 p-0"
               disabled={currentPage === 1}
               onClick={() => setPage(currentPage - 1)}
-              aria-label="Previous page"
+              aria-label={t('page.previous')}
             >
               <ChevronLeft size={15} />
             </button>
@@ -970,7 +972,7 @@ export default function ProfilesPage() {
               className="btn btn-ghost h-7 w-7 p-0"
               disabled={currentPage === totalPages}
               onClick={() => setPage(currentPage + 1)}
-              aria-label="Next page"
+              aria-label={t('page.next')}
             >
               <ChevronRight size={15} />
             </button>
@@ -991,31 +993,31 @@ export default function ProfilesPage() {
         title={confirm?.title ?? ''}
         body={confirm?.body ?? ''}
         confirmLabel={confirm?.label}
-        destructive={confirm?.label === 'Delete'}
+        destructive={confirm?.destructive ?? false}
         onConfirm={runConfirmed}
         onCancel={() => setConfirm(null)}
       />
 
       <Modal
         open={exportOpen}
-        title="Export to Excel"
+        title={t('excel.title')}
         onClose={() => setExportOpen(false)}
         width={440}
         footer={
           <>
             <button className="btn btn-default" onClick={() => setExportOpen(false)}>
-              Cancel
+              {t('action.cancel')}
             </button>
             <button className="btn btn-primary" onClick={exportExcel}>
-              Export
+              {t('excel.confirm')}
             </button>
           </>
         }
       >
         <p className="text-ink-dim">
-          The spreadsheet includes every profile setting so it can be imported back — including
-          <span className="text-ink"> proxy passwords in clear text</span>. Store the file somewhere
-          you would keep the passwords themselves.
+          {t('excel.warningBefore')}
+          <span className="text-ink">{t('excel.warningEmphasis')}</span>
+          {t('excel.warningAfter')}
         </p>
       </Modal>
     </>
@@ -1055,7 +1057,7 @@ function ProxyCell({ profile, checking }: { profile: Profile; checking: boolean 
       {checking ? (
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-faint">
           <span className="signal-pulse h-1.5 w-1.5 rounded-full bg-signal" />
-          Checking…
+          {t('status.checking')}
         </div>
       ) : check ? (
         <ProxyResult check={check} />
@@ -1065,7 +1067,8 @@ function ProxyCell({ profile, checking }: { profile: Profile; checking: boolean 
 }
 
 function ProxyResult({ check }: { check: ProxyCheckRecord }) {
-  const { tone, label, detail } = readProxyCheck(check)
+  const t = useT()
+  const { tone, label, detail } = readProxyCheck(check, t)
   const dot = tone === 'ok' ? 'bg-ok' : tone === 'warn' ? 'bg-warn' : 'bg-danger'
   // Latency and country only mean something when the proxy answered; when it did
   // not, the reason is the only thing worth the space.
@@ -1080,26 +1083,38 @@ function ProxyResult({ check }: { check: ProxyCheckRecord }) {
       {/* min-w-0 so this is the part that gives way: a flex item will not shrink
           below its content without it, and the truncation never happens. */}
       <span className="min-w-0 truncate font-mono">{parts.filter(Boolean).join(' · ')}</span>
-      <span className="shrink-0 text-ink-dim/70">· {formatLastUsed(check.checked_at)}</span>
+      <span className="shrink-0 text-ink-dim/70">· {formatLastUsed(check.checked_at, t)}</span>
     </div>
   )
 }
 
+const STATUS_KEYS: Record<string, MessageKey> = {
+  active: 'statusOpt.active',
+  inactive: 'statusOpt.inactive',
+  blocked: 'statusOpt.blocked',
+  maintenance: 'statusOpt.maintenance',
+}
+
 function StatusCell({ status, running }: { status: string; running: boolean }) {
+  const t = useT()
   if (running) {
     return (
       <span className="inline-flex items-center gap-1.5 text-signal">
         <span className="signal-pulse h-1.5 w-1.5 rounded-full bg-signal" />
-        Running
+        {t('status.running')}
       </span>
     )
   }
   const tone =
     status === 'blocked' ? 'bg-danger' : status === 'maintenance' ? 'bg-ink-dim' : 'bg-ink-faint'
+  const key = STATUS_KEYS[status]
   return (
-    <span className="inline-flex items-center gap-1.5 capitalize text-ink-dim">
+    // No capitalize: the translations are already written with the casing
+    // they should have, and the class would also fight languages that do not
+    // capitalise the way English does.
+    <span className="inline-flex items-center gap-1.5 text-ink-dim">
       <span className={`h-1.5 w-1.5 rounded-full ${tone}`} />
-      {status}
+      {key ? t(key) : status}
     </span>
   )
 }

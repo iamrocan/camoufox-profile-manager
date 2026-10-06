@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { Check, Info, TriangleAlert, X } from 'lucide-react'
 
+import { useT } from '@/lib/i18n'
+
 type ToastKind = 'ok' | 'error' | 'info'
 
 interface Toast {
@@ -47,6 +49,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ToastRow({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
+  const translate = useT()
+
   useEffect(() => {
     // Errors stay longer — they usually carry something worth reading.
     const timer = setTimeout(onDismiss, toast.kind === 'error' ? 8000 : 4000)
@@ -66,7 +70,11 @@ function ToastRow({ toast, onDismiss }: { toast: Toast; onDismiss: () => void })
           <div className="mt-0.5 whitespace-pre-wrap break-words text-ink-dim">{toast.detail}</div>
         )}
       </div>
-      <button onClick={onDismiss} aria-label="Dismiss" className="h-fit text-ink-faint hover:text-ink">
+      <button
+        onClick={onDismiss}
+        aria-label={translate('toast.dismiss')}
+        className="h-fit text-ink-faint hover:text-ink"
+      >
         <X size={14} strokeWidth={2} />
       </button>
     </div>

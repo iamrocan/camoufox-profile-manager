@@ -87,6 +87,10 @@ const en = {
   'action.clearData': 'Clear data',
   'action.delete': 'Delete',
   'action.cancel': 'Cancel',
+  'action.runNow': 'Run now',
+  'action.pause': 'Pause',
+  'action.resume': 'Resume',
+  'action.history': 'History',
 
   // Status
   'status.running': 'Running',
@@ -118,6 +122,385 @@ const en = {
   'delete.body':
     '"{name}" and its browser data will be removed. This cannot be undone.',
   'delete.done': 'Profile deleted',
+
+  // Bulk actions
+  'bulk.selected': '{count} selected',
+  'bulk.checkProxies': 'Check proxies ({count})',
+  'bulk.checking': 'Checking… ({count})',
+  'bulk.clearGeography': 'Clear geography ({count})',
+  'bulk.clearSelection': 'Clear',
+  'bulk.deleteTitle': 'Delete {count} profiles',
+  'bulk.deleteBody':
+    'The selected profiles and their browser data will be removed. This cannot be undone.',
+  'bulk.deleteDone': 'Deleted {count} profiles',
+  'bulk.geoTitle': 'Clear geography of {count} profiles',
+  'bulk.geoBody':
+    'The stored timezone and coordinates are unset, so Camoufox derives both — and the WebRTC address — from where each profile’s proxy comes out, as a profile created today does. Languages and the pinned machine are untouched.',
+  'bulk.geoConfirm': 'Clear',
+  'bulk.geoDone': 'Cleared {count} profiles',
+  'bulk.closeAllTitle': 'Close all browsers',
+  'bulk.closeAllBody': '{count} running browsers will be closed.',
+  'bulk.closeAllConfirm': 'Close all',
+
+  // Empty states
+  'empty.apiTitle': 'Cannot reach the API',
+  'empty.retry': 'Retry',
+  'empty.noneTitle': 'No profiles yet',
+  'empty.noneBody':
+    'A profile is one isolated browser identity — its own fingerprint, proxy, cookies and storage. Create one to get started.',
+  'empty.createFirst': 'Create your first profile',
+  'empty.noMatchTitle': 'No matches',
+  'empty.noMatchBody': 'No profile matches the current search and filter.',
+  'empty.clearFilters': 'Clear filters',
+
+  // Pagination
+  'page.range': '{from}–{to} of {total}',
+  'page.previous': 'Previous page',
+  'page.next': 'Next page',
+
+  // Excel export dialog
+  'excel.title': 'Export to Excel',
+  'excel.confirm': 'Export',
+  // Split in three because the middle clause is emphasised in the markup.
+  'excel.warningBefore':
+    'The spreadsheet includes every profile setting so it can be imported back — including',
+  'excel.warningEmphasis': ' proxy passwords in clear text',
+  'excel.warningAfter':
+    '. Store the file somewhere you would keep the passwords themselves.',
+
+  // Toasts
+  'toast.launchFailed': 'Could not launch browser',
+  'toast.closeFailed': 'Could not close browser',
+  'toast.packing': 'Packing the profile…',
+  'toast.packingBody': 'Cookies and history make this take a moment.',
+  'toast.exported': 'Profile exported',
+  'toast.exportedBody':
+    'The archive holds session cookies and the proxy password — keep it like a password.',
+  'toast.exportFailed': 'Could not export the profile',
+  'toast.imported': 'Profile imported',
+  'toast.importFailed': 'Could not import the profile',
+  'toast.cloned': 'Profile cloned',
+  'toast.cloneFailed': 'Could not clone profile',
+  'toast.checkFailed': 'Could not check the proxy',
+  'toast.dismiss': 'Dismiss',
+
+  // --- Profile form -------------------------------------------------------
+  'form.newTitle': 'New profile',
+  'form.editTitle': 'Edit profile',
+  'form.newHint': 'Anything left blank is generated as a consistent fingerprint.',
+  'form.save': 'Save changes',
+  'form.create': 'Create profile',
+  'form.regenerate': 'Regenerate fingerprint',
+
+  'form.identity': 'Identity',
+  'form.name': 'Name',
+  'form.namePlaceholder': 'account-1',
+  'form.group': 'Group',
+  'form.noGroup': 'No group',
+  'form.os': 'Operating system',
+  'form.status': 'Status',
+  'form.notes': 'Notes',
+  'form.osPinnedNote':
+    'Saving this changes nothing a page can see: the pinned machine reports {os} and keeps doing so. The Machine panel then offers both ways out.',
+  'form.osUnpinnedNote':
+    'Screen size, locale and fonts stay as they were. Use Regenerate fingerprint for a set that matches the new OS.',
+
+  'form.proxy': 'Proxy',
+  'form.proxyHint': 'Leave the server empty for a direct connection.',
+  'form.proxyType': 'Type',
+  'form.proxyServer': 'Server',
+  'form.proxyServerPlaceholder': 'host:port',
+  'form.proxyUser': 'Username',
+  'form.proxyPassword': 'Password',
+  'form.socksAuthWarning':
+    'Firefox cannot authenticate to a SOCKS proxy, so this profile will fail to launch. Use an HTTP or HTTPS proxy for credentials, or a SOCKS proxy that allows this IP without them.',
+
+  'form.machine': 'Machine',
+  'form.machineHint':
+    'A generated fingerprint is internally consistent; a preset is a combination that genuinely exists. Either way the profile keeps it for good.',
+  'form.devicePreset': 'Device preset',
+  'form.generateAuto': 'Generate one automatically',
+  'form.realDevices': '{count} real {os} devices available.',
+
+  'form.fingerprint': 'Fingerprint',
+  'form.fingerprintHint':
+    'Camoufox keeps the fingerprint internally consistent; only override what you need.',
+  'form.timezone': 'Timezone',
+  'form.languages': 'Languages',
+  'form.cpuCores': 'CPU cores',
+  'form.cpuAuto': 'auto',
+  'form.webrtc': 'WebRTC',
+  'form.webrtcReplace': 'Replace with proxy IP',
+  'form.webrtcReal': 'Use the real IP',
+  'form.webrtcForward': 'Forward',
+  'form.webrtcDisable': 'Disable WebRTC',
+  'form.canvas': 'Canvas',
+  'form.canvasRandom': 'Randomised each session (default)',
+  'form.canvasStable': 'Same canvas every launch',
+  'form.canvasRandomHint':
+    'A site sees a different canvas each session, and a different one per site. Safer against tracking, but a long-lived account looks like new hardware every visit.',
+  'form.canvasStableHint':
+    'The canvas stays the same across sessions, which is what a real machine does. The cost is that it is identical across sites, so they can correlate it.',
+  'form.windowWidth': 'Window width',
+  'form.windowHeight': 'Window height',
+  'form.geolocation': 'Geolocation',
+  'form.geoFromProxy': 'From the proxy IP',
+  'form.geoManual': 'Set coordinates',
+  'form.latitude': 'Latitude',
+  'form.longitude': 'Longitude',
+
+  // Form toasts and validation
+  'form.nameRequired': 'Name is required',
+  'form.geoNeedsBoth': 'Manual geolocation needs both latitude and longitude',
+  'form.updated': 'Profile updated',
+  'form.created': 'Profile created',
+  'form.pinnedToDevice': 'pinned to a real device',
+  'form.updateFailed': 'Could not update profile',
+  'form.createFailed': 'Could not create profile',
+  'form.browserVersionFailed': 'Could not update the browser version',
+  'form.reconcileFailed': 'Could not reconcile the operating system',
+  'form.geoCleared': 'Timezone and coordinates cleared',
+  'form.geoClearedBody': 'Both now follow the proxy.',
+  'form.geoClearFailed': 'Could not clear the geography',
+  'form.fingerprintRegenerated': 'Fingerprint regenerated',
+  'form.regenerateFailed': 'Could not regenerate fingerprint',
+  'form.checkProxyFailed': 'Could not check the proxy',
+
+  // Relative times. Rendered by a plain helper rather than a component, so the
+  // translate function is handed to it instead of read from the context.
+  'time.never': 'Never',
+  'time.justNow': 'Just now',
+  'time.minutesAgo': '{n}m ago',
+  'time.hoursAgo': '{n}h ago',
+  'time.daysAgo': '{n}d ago',
+
+  // How a checked proxy reads
+  'health.ok': 'Healthy',
+  'health.warn': 'Needs attention',
+  'health.danger': 'Failing',
+  'health.answered': 'Proxy answered',
+  'health.noAnswer': 'Proxy did not answer',
+  'health.checked': 'Checked {when}',
+
+  // Excel round trip
+  'excel.exported': 'Exported to camoufox-profiles.xlsx',
+  'excel.exportedBody': 'The file contains proxy passwords in clear text.',
+  'excel.exportFailed': 'Export failed',
+  'excel.imported': 'Imported {count} profiles',
+  'excel.importErrors': 'Import finished with errors',
+  'excel.importFailed': 'Import failed',
+
+  // Dialog shell
+  'modal.close': 'Close',
+  'modal.confirm': 'Confirm',
+
+  // Login
+  'login.title': 'Sign in',
+  'login.username': 'Username',
+  'login.password': 'Password',
+  'login.submit': 'Sign in',
+  'login.busy': 'Signing in…',
+
+  // --- Profile form, continued ---------------------------------------------
+  'form.createdOn': '{id} · created {date}',
+  'form.presetCores': '{count} cores',
+
+  // Somebody else saved the same profile while this form was open
+  'form.staleTitle': 'Someone else changed this profile',
+  'form.staleBody':
+    '{changed}. Nothing you typed was lost — press Save again to apply your version.',
+  'form.staleBodyPlain': 'Your edit was not saved. Press Save again to apply your version.',
+  'form.staleBodyReopen':
+    'Your edit was not saved. Reopen the profile to see the current values.',
+  'change.name': 'name is now "{name}"',
+  'change.group': 'group is now "{group}"',
+  'change.groupCleared': 'group was cleared',
+  'change.status': 'status is now {status}',
+  'change.notes': 'notes changed',
+  'change.proxy': 'the proxy changed',
+  'change.browserSettings': 'browser settings changed',
+  'change.andMore': '{shown}, and {count} more',
+
+  'form.browserUpdated': 'Browser updated to Firefox {version}',
+  'form.browserUpdatedBody': 'The machine is unchanged.',
+  'form.osSetBack': 'Set back to {os}',
+  'form.osSetBackBody': 'The machine is untouched.',
+  'form.osNewMachine': 'New machine pinned',
+  'form.osNewMachineBody': '{screen} · {cores} cores. The old hardware is gone.',
+
+  'form.geoStatedTitle': 'This profile states where it is instead of taking it from its proxy.',
+  'form.geoStatedBody':
+    'A profile created today leaves both unset, so Camoufox derives the timezone, the coordinates and the WebRTC address from the exit address. Profiles created earlier were given a randomly chosen region, and nothing records which values were a choice — so clear them if this one was not.',
+  'form.geoClearBoth': 'Clear both, follow the proxy',
+
+  // The pinned machine panel
+  'machine.unpinnedHint':
+    'Assigned on the first launch, then reused every time so this profile stays the same computer.',
+  'machine.pinnedHint':
+    'Pinned across launches — {count} properties. Regenerate the fingerprint to move this profile to different hardware.',
+  'machine.browser': 'Browser',
+  'machine.screen': 'Screen',
+  'machine.gpu': 'GPU',
+  'machine.fonts': 'Fonts',
+  'machine.userAgent': 'User agent',
+  'machine.unknownOs': 'unknown',
+  'machine.outdatedTitle':
+    'This profile still reports Firefox {reported}; the installed browser is {installed}.',
+  'machine.outdatedBody':
+    'Updating changes only the browser version. The screen, GPU, cores, fonts and canvas stay exactly as they are — the same computer, with its browser updated.',
+  'machine.update': 'Update',
+  'machine.osMismatchTitle':
+    'This profile is set to {settings}, but its pinned machine is a {pinned} one — and the machine is what every page sees.',
+  'machine.osMismatchBody':
+    'Keeping the machine puts the setting back to {pinned} and changes no fingerprint at all. Pinning a {settings} machine instead gives this profile different hardware — screen, GPU, cores, fonts and canvas — which any account already warmed up on the old one will notice.',
+  'machine.keepMachine': 'Keep this machine',
+  'machine.newMachine': 'New {os} machine',
+
+  // What a proxy check found
+  'check.exitsAt': 'Exits at',
+
+  // --- Groups ---------------------------------------------------------------
+  'groups.title': 'Groups',
+  'groups.new': 'New group',
+  'groups.editTitle': 'Edit group',
+  'groups.createSubmit': 'Create group',
+  'groups.namePlaceholder': 'Client A',
+  'groups.description': 'Description',
+  'groups.nameRequired': 'Name is required',
+  'groups.updated': 'Group updated',
+  'groups.created': 'Group created',
+  'groups.updateFailed': 'Could not update group',
+  'groups.createFailed': 'Could not create group',
+  'groups.deleted': 'Group deleted',
+  'groups.deleteFailed': 'Could not delete group',
+  'groups.noneTitle': 'No groups yet',
+  'groups.noneBody':
+    'Groups organise profiles by purpose or client. Assign a profile to a group when you create or edit it.',
+  'groups.createFirst': 'Create a group',
+  'groups.editAria': 'Edit {name}',
+  'groups.deleteAria': 'Delete {name}',
+  'groups.deleteTitle': 'Delete group',
+  'groups.deleteBody':
+    '"{name}" will be removed. Its {count} profile(s) are kept and become ungrouped.',
+  'col.description': 'DESCRIPTION',
+  'col.profiles': 'PROFILES',
+
+  // --- Schedules ------------------------------------------------------------
+  'schedules.title': 'Schedules',
+  'schedules.new': 'New schedule',
+  'schedules.editTitle': 'Edit schedule',
+  'schedules.createSubmit': 'Create schedule',
+  'schedules.formHint':
+    "Times are read on the server's clock — the machine running camoufox-pm.",
+  'schedules.noneTitle': 'Nothing scheduled',
+  'schedules.noneBody':
+    "Open a profile's browser on a schedule, or keep its pinned browser version current. Runs missed while the app is closed are skipped, not replayed.",
+  'schedules.createFirst': 'Create a schedule',
+  'schedules.chooseProfile': 'Choose a profile',
+  'schedules.updated': 'Schedule updated',
+  'schedules.created': 'Schedule created',
+  'schedules.updateFailed': 'Could not update schedule',
+  'schedules.createFailed': 'Could not create schedule',
+  'schedules.pausedToast': 'Schedule paused',
+  'schedules.resumedToast': 'Schedule resumed',
+  'schedules.ran': 'Task ran',
+  'schedules.skippedToast': 'Task skipped',
+  'schedules.failed': 'Task failed',
+  'schedules.runFailed': 'Could not run the task',
+  'schedules.deleted': 'Schedule deleted',
+  'schedules.deleteFailed': 'Could not delete schedule',
+  'schedules.historyFailed': 'Could not load the history',
+  'schedules.deletedProfile': 'deleted',
+  'schedules.sessionMinutes': '{n}m session',
+  'schedules.pausedCell': 'paused',
+  'schedules.runAria': 'Run {name} now',
+  'schedules.pauseAria': 'Pause schedule',
+  'schedules.resumeAria': 'Resume schedule',
+  'schedules.historyAria': 'Run history',
+  'schedules.editAria': 'Edit schedule',
+  'schedules.deleteAria': 'Delete schedule',
+  'schedules.profile': 'Profile',
+  'schedules.task': 'Task',
+  'schedules.actionLaunch': 'Open browser',
+  'schedules.actionRefresh': 'Refresh browser version',
+  'schedules.actionLaunchLong': 'Open browser — warm the profile with a session',
+  'schedules.actionRefreshLong':
+    "Refresh browser version — keep the pinned machine's browser current",
+  'schedules.refreshHint':
+    'Moves only the browser version onto the installed one; the screen, GPU, cores and seeds stay. Regenerating the hardware itself is deliberately not schedulable — it would make the profile a new machine on a timer.',
+  'schedules.launchHint':
+    'Launches through the same session manager as the Open button; if the browser is already running, the run is skipped.',
+  'schedules.repeats': 'Repeats',
+  'schedules.daily': 'Daily at a time',
+  'schedules.interval': 'Every N minutes',
+  'schedules.everyMinutes': 'Every (minutes)',
+  'schedules.atServerTime': 'At (server time)',
+  'schedules.onDays': 'On days (none = every day)',
+  'schedules.closeAfter': 'Close after (minutes, empty = leave open)',
+  'schedules.leaveOpen': 'Leave the browser open',
+  'schedules.historyTitle': 'Run history',
+  'schedules.historySubtitle': '{profile} · {action} · newest first, last 20 kept',
+  'schedules.noRuns': 'No runs recorded yet.',
+  'schedules.deleteTitle': 'Delete schedule',
+  'schedules.deleteBody':
+    'The {action} schedule for "{profile}" and its run history will be removed. The profile itself is not touched.',
+  'col.profile': 'PROFILE',
+  'col.task': 'TASK',
+  'col.when': 'WHEN',
+  'col.nextRun': 'NEXT RUN',
+  'col.lastRun': 'LAST RUN',
+  'outcome.ok': 'ok',
+  'outcome.skipped': 'skipped',
+  'outcome.error': 'error',
+  'outcome.missed': 'missed',
+  'day.mon': 'Mon',
+  'day.tue': 'Tue',
+  'day.wed': 'Wed',
+  'day.thu': 'Thu',
+  'day.fri': 'Fri',
+  'day.sat': 'Sat',
+  'day.sun': 'Sun',
+  'when.everyDays': 'every {n}d',
+  'when.everyHours': 'every {n}h',
+  'when.everyMinutes': 'every {n}m',
+  'when.dailyAt': 'daily at {time}',
+
+  // --- Settings -------------------------------------------------------------
+  'settings.title': 'Settings',
+  'settings.keySaved': 'API key saved',
+  'settings.keyCleared': 'API key cleared',
+  'settings.keyNote': 'Stored in this browser only, and sent as X-API-Key.',
+  'settings.security': 'Security',
+  'settings.securityNote': 'Configured with environment variables; restart to apply changes.',
+  'settings.encryption': 'Proxy password encryption',
+  'settings.encryptionOn': 'Passwords are encrypted at rest with CPM_SECRET_KEY.',
+  'settings.encryptionOff':
+    'Passwords are stored as plain text. Set CPM_SECRET_KEY to encrypt them.',
+  'settings.userAccounts': 'User accounts',
+  'settings.userAccountsOn': 'Login is required. Manage accounts with: camoufox-pm user',
+  'settings.userAccountsOff': 'No user accounts. Create one with: camoufox-pm user add <name>',
+  'settings.apiKey': 'API key',
+  'settings.apiKeyOn': 'Requests must send a matching X-API-Key header.',
+  'settings.apiKeyOffAuth': 'No API key is set. Machine clients have no way in; humans log in.',
+  'settings.apiKeyOffOpen': 'No API key is set. Anyone who can reach this port can use the API.',
+  'settings.browserKey': "This browser's key",
+  'settings.keyPlaceholder': 'Paste CPM_API_KEY to keep using this UI',
+  'settings.keyAria': 'API key for this browser',
+  'settings.saveKey': 'Save',
+  'settings.boundTo': 'Bound to',
+  'settings.reachable': 'reachable beyond this machine',
+  'settings.instance': 'Instance',
+  'settings.version': 'Version',
+  'settings.uptime': 'Uptime',
+  'settings.database': 'Database',
+  'settings.camoufox': 'Camoufox browser',
+  'settings.camoufoxOn': 'Installed and ready to launch profiles.',
+  'settings.camoufoxOff': 'Not installed. Run: camoufox fetch',
+  'settings.usage': 'Usage',
+  'settings.profiles': 'Profiles',
+  'settings.groups': 'Groups',
+  'settings.runningBrowsers': 'Running browsers',
+  'settings.memoryDisk': 'Memory / disk',
 
   // Generic
   'generic.of': 'of',
@@ -180,6 +563,10 @@ const es: Record<MessageKey, string> = {
   'action.clearData': 'Limpiar datos',
   'action.delete': 'Eliminar',
   'action.cancel': 'Cancelar',
+  'action.runNow': 'Ejecutar ahora',
+  'action.pause': 'Pausar',
+  'action.resume': 'Reanudar',
+  'action.history': 'Historial',
 
   'status.running': 'En ejecución',
   'status.active': 'Activo',
@@ -208,6 +595,371 @@ const es: Record<MessageKey, string> = {
     'Se eliminará "{name}" junto con sus datos de navegación. Esto no se puede deshacer.',
   'delete.done': 'Perfil eliminado',
 
+  'bulk.selected': '{count} seleccionados',
+  'bulk.checkProxies': 'Probar proxies ({count})',
+  'bulk.checking': 'Probando… ({count})',
+  'bulk.clearGeography': 'Limpiar geografía ({count})',
+  'bulk.clearSelection': 'Quitar selección',
+  'bulk.deleteTitle': 'Eliminar {count} perfiles',
+  'bulk.deleteBody':
+    'Se eliminarán los perfiles seleccionados junto con sus datos de navegación. Esto no se puede deshacer.',
+  'bulk.deleteDone': '{count} perfiles eliminados',
+  'bulk.geoTitle': 'Limpiar geografía de {count} perfiles',
+  'bulk.geoBody':
+    'Se quitan la zona horaria y las coordenadas guardadas, así Camoufox deriva ambas — y la dirección WebRTC — de la salida del proxy de cada perfil, igual que un perfil creado hoy. Los idiomas y la máquina fijada no se tocan.',
+  'bulk.geoConfirm': 'Limpiar',
+  'bulk.geoDone': '{count} perfiles limpiados',
+  'bulk.closeAllTitle': 'Cerrar todos los navegadores',
+  'bulk.closeAllBody': 'Se cerrarán {count} navegadores en ejecución.',
+  'bulk.closeAllConfirm': 'Cerrar todos',
+
+  'empty.apiTitle': 'No se puede conectar con la API',
+  'empty.retry': 'Reintentar',
+  'empty.noneTitle': 'Todavía no hay perfiles',
+  'empty.noneBody':
+    'Un perfil es una identidad de navegador aislada — con su propio fingerprint, proxy, cookies y almacenamiento. Crea uno para empezar.',
+  'empty.createFirst': 'Crear tu primer perfil',
+  'empty.noMatchTitle': 'Sin resultados',
+  'empty.noMatchBody': 'Ningún perfil coincide con la búsqueda y el filtro actuales.',
+  'empty.clearFilters': 'Limpiar filtros',
+
+  'page.range': '{from}–{to} de {total}',
+  'page.previous': 'Página anterior',
+  'page.next': 'Página siguiente',
+
+  'excel.title': 'Exportar a Excel',
+  'excel.confirm': 'Exportar',
+  'excel.warningBefore':
+    'La hoja de cálculo incluye todos los ajustes del perfil para poder reimportarlos — incluidas',
+  'excel.warningEmphasis': ' las contraseñas de proxy en texto plano',
+  'excel.warningAfter':
+    '. Guarda el archivo donde guardarías las contraseñas mismas.',
+
+  'toast.launchFailed': 'No se pudo abrir el navegador',
+  'toast.closeFailed': 'No se pudo cerrar el navegador',
+  'toast.packing': 'Empaquetando el perfil…',
+  'toast.packingBody': 'Las cookies y el historial hacen que esto tarde un momento.',
+  'toast.exported': 'Perfil exportado',
+  'toast.exportedBody':
+    'El archivo contiene cookies de sesión y la contraseña del proxy — trátalo como una contraseña.',
+  'toast.exportFailed': 'No se pudo exportar el perfil',
+  'toast.imported': 'Perfil importado',
+  'toast.importFailed': 'No se pudo importar el perfil',
+  'toast.cloned': 'Perfil duplicado',
+  'toast.cloneFailed': 'No se pudo duplicar el perfil',
+  'toast.checkFailed': 'No se pudo probar el proxy',
+  'toast.dismiss': 'Descartar',
+
+  'form.newTitle': 'Nuevo perfil',
+  'form.editTitle': 'Editar perfil',
+  'form.newHint': 'Todo lo que dejes vacío se genera como un fingerprint consistente.',
+  'form.save': 'Guardar cambios',
+  'form.create': 'Crear perfil',
+  'form.regenerate': 'Regenerar fingerprint',
+
+  'form.identity': 'Identidad',
+  'form.name': 'Nombre',
+  'form.namePlaceholder': 'cuenta-1',
+  'form.group': 'Grupo',
+  'form.noGroup': 'Sin grupo',
+  'form.os': 'Sistema operativo',
+  'form.status': 'Estado',
+  'form.notes': 'Notas',
+  'form.osPinnedNote':
+    'Guardar esto no cambia nada que una página pueda ver: la máquina fijada reporta {os} y lo seguirá haciendo. El panel Máquina ofrece después las dos salidas.',
+  'form.osUnpinnedNote':
+    'El tamaño de pantalla, el idioma y las fuentes quedan como estaban. Usa Regenerar fingerprint para un conjunto que corresponda al nuevo SO.',
+
+  'form.proxy': 'Proxy',
+  'form.proxyHint': 'Deja el servidor vacío para una conexión directa.',
+  'form.proxyType': 'Tipo',
+  'form.proxyServer': 'Servidor',
+  'form.proxyServerPlaceholder': 'host:puerto',
+  'form.proxyUser': 'Usuario',
+  'form.proxyPassword': 'Contraseña',
+  'form.socksAuthWarning':
+    'Firefox no puede autenticarse contra un proxy SOCKS, así que este perfil no logrará abrirse. Usa un proxy HTTP o HTTPS para las credenciales, o un proxy SOCKS que permita esta IP sin ellas.',
+
+  'form.machine': 'Máquina',
+  'form.machineHint':
+    'Un fingerprint generado es internamente consistente; un preset es una combinación que existe de verdad. En cualquier caso el perfil lo conserva para siempre.',
+  'form.devicePreset': 'Dispositivo preconfigurado',
+  'form.generateAuto': 'Generar uno automáticamente',
+  'form.realDevices': '{count} dispositivos {os} reales disponibles.',
+
+  'form.fingerprint': 'Fingerprint',
+  'form.fingerprintHint':
+    'Camoufox mantiene el fingerprint internamente consistente; solo cambia lo que necesites.',
+  'form.timezone': 'Zona horaria',
+  'form.languages': 'Idiomas',
+  'form.cpuCores': 'Núcleos de CPU',
+  'form.cpuAuto': 'automático',
+  'form.webrtc': 'WebRTC',
+  'form.webrtcReplace': 'Reemplazar con la IP del proxy',
+  'form.webrtcReal': 'Usar la IP real',
+  'form.webrtcForward': 'Reenviar',
+  'form.webrtcDisable': 'Desactivar WebRTC',
+  'form.canvas': 'Canvas',
+  'form.canvasRandom': 'Aleatorio en cada sesión (predeterminado)',
+  'form.canvasStable': 'El mismo canvas en cada inicio',
+  'form.canvasRandomHint':
+    'Cada sesión un sitio ve un canvas distinto, y uno distinto por sitio. Más seguro contra el rastreo, pero una cuenta de larga vida parece hardware nuevo en cada visita.',
+  'form.canvasStableHint':
+    'El canvas se mantiene igual entre sesiones, que es lo que hace una máquina real. El costo es que es idéntico entre sitios, así que pueden correlacionarlo.',
+  'form.windowWidth': 'Ancho de ventana',
+  'form.windowHeight': 'Alto de ventana',
+  'form.geolocation': 'Geolocalización',
+  'form.geoFromProxy': 'Desde la IP del proxy',
+  'form.geoManual': 'Definir coordenadas',
+  'form.latitude': 'Latitud',
+  'form.longitude': 'Longitud',
+
+  'form.nameRequired': 'El nombre es obligatorio',
+  'form.geoNeedsBoth': 'La geolocalización manual necesita latitud y longitud',
+  'form.updated': 'Perfil actualizado',
+  'form.created': 'Perfil creado',
+  'form.pinnedToDevice': 'fijado a un dispositivo real',
+  'form.updateFailed': 'No se pudo actualizar el perfil',
+  'form.createFailed': 'No se pudo crear el perfil',
+  'form.browserVersionFailed': 'No se pudo actualizar la versión del navegador',
+  'form.reconcileFailed': 'No se pudo reconciliar el sistema operativo',
+  'form.geoCleared': 'Zona horaria y coordenadas limpiadas',
+  'form.geoClearedBody': 'Ambas siguen ahora al proxy.',
+  'form.geoClearFailed': 'No se pudo limpiar la geografía',
+  'form.fingerprintRegenerated': 'Fingerprint regenerado',
+  'form.regenerateFailed': 'No se pudo regenerar el fingerprint',
+  'form.checkProxyFailed': 'No se pudo probar el proxy',
+
+  'time.never': 'Nunca',
+  'time.justNow': 'Ahora mismo',
+  'time.minutesAgo': 'hace {n}m',
+  'time.hoursAgo': 'hace {n}h',
+  'time.daysAgo': 'hace {n}d',
+
+  'health.ok': 'Correcto',
+  'health.warn': 'Requiere atención',
+  'health.danger': 'Con fallos',
+  'health.answered': 'El proxy respondió',
+  'health.noAnswer': 'El proxy no respondió',
+  'health.checked': 'Probado {when}',
+
+  'excel.exported': 'Exportado a camoufox-profiles.xlsx',
+  'excel.exportedBody': 'El archivo contiene las contraseñas de proxy en texto plano.',
+  'excel.exportFailed': 'Falló la exportación',
+  'excel.imported': '{count} perfiles importados',
+  'excel.importErrors': 'La importación terminó con errores',
+  'excel.importFailed': 'Falló la importación',
+
+  'modal.close': 'Cerrar',
+  'modal.confirm': 'Confirmar',
+
+  'login.title': 'Iniciar sesión',
+  'login.username': 'Usuario',
+  'login.password': 'Contraseña',
+  'login.submit': 'Iniciar sesión',
+  'login.busy': 'Iniciando sesión…',
+
+  'form.createdOn': '{id} · creado el {date}',
+  'form.presetCores': '{count} núcleos',
+
+  'form.staleTitle': 'Otra persona cambió este perfil',
+  'form.staleBody':
+    '{changed}. No se perdió nada de lo que escribiste — pulsa Guardar otra vez para aplicar tu versión.',
+  'form.staleBodyPlain':
+    'Tu cambio no se guardó. Pulsa Guardar otra vez para aplicar tu versión.',
+  'form.staleBodyReopen':
+    'Tu cambio no se guardó. Vuelve a abrir el perfil para ver los valores actuales.',
+  'change.name': 'el nombre ahora es "{name}"',
+  'change.group': 'el grupo ahora es "{group}"',
+  'change.groupCleared': 'se quitó el grupo',
+  'change.status': 'el estado ahora es {status}',
+  'change.notes': 'cambiaron las notas',
+  'change.proxy': 'cambió el proxy',
+  'change.browserSettings': 'cambiaron los ajustes del navegador',
+  'change.andMore': '{shown}, y {count} más',
+
+  'form.browserUpdated': 'Navegador actualizado a Firefox {version}',
+  'form.browserUpdatedBody': 'La máquina no cambió.',
+  'form.osSetBack': 'Devuelto a {os}',
+  'form.osSetBackBody': 'La máquina queda intacta.',
+  'form.osNewMachine': 'Nueva máquina fijada',
+  'form.osNewMachineBody': '{screen} · {cores} núcleos. El hardware anterior ya no está.',
+
+  'form.geoStatedTitle': 'Este perfil declara dónde está en vez de tomarlo de su proxy.',
+  'form.geoStatedBody':
+    'Un perfil creado hoy deja ambas sin definir, así Camoufox deriva la zona horaria, las coordenadas y la dirección WebRTC de la dirección de salida. A los perfiles creados antes se les asignó una región al azar, y nada registra qué valores fueron una decisión — así que límpialos si este no lo fue.',
+  'form.geoClearBoth': 'Limpiar ambas, seguir al proxy',
+
+  'machine.unpinnedHint':
+    'Se asigna en el primer inicio y luego se reutiliza siempre, así este perfil sigue siendo la misma computadora.',
+  'machine.pinnedHint':
+    'Fijada entre inicios — {count} propiedades. Regenera el fingerprint para mover este perfil a otro hardware.',
+  'machine.browser': 'Navegador',
+  'machine.screen': 'Pantalla',
+  'machine.gpu': 'GPU',
+  'machine.fonts': 'Fuentes',
+  'machine.userAgent': 'User agent',
+  'machine.unknownOs': 'desconocido',
+  'machine.outdatedTitle':
+    'Este perfil todavía reporta Firefox {reported}; el navegador instalado es {installed}.',
+  'machine.outdatedBody':
+    'Actualizar cambia solo la versión del navegador. La pantalla, la GPU, los núcleos, las fuentes y el canvas quedan exactamente igual — la misma computadora, con su navegador actualizado.',
+  'machine.update': 'Actualizar',
+  'machine.osMismatchTitle':
+    'Este perfil está configurado como {settings}, pero su máquina fijada es {pinned} — y la máquina es lo que ve cada página.',
+  'machine.osMismatchBody':
+    'Conservar la máquina devuelve el ajuste a {pinned} y no cambia ningún fingerprint. Fijar en su lugar una máquina {settings} le da a este perfil otro hardware — pantalla, GPU, núcleos, fuentes y canvas — algo que notará cualquier cuenta ya calentada con el anterior.',
+  'machine.keepMachine': 'Conservar esta máquina',
+  'machine.newMachine': 'Nueva máquina {os}',
+
+  'check.exitsAt': 'Sale en',
+
+  'groups.title': 'Grupos',
+  'groups.new': 'Nuevo grupo',
+  'groups.editTitle': 'Editar grupo',
+  'groups.createSubmit': 'Crear grupo',
+  'groups.namePlaceholder': 'Cliente A',
+  'groups.description': 'Descripción',
+  'groups.nameRequired': 'El nombre es obligatorio',
+  'groups.updated': 'Grupo actualizado',
+  'groups.created': 'Grupo creado',
+  'groups.updateFailed': 'No se pudo actualizar el grupo',
+  'groups.createFailed': 'No se pudo crear el grupo',
+  'groups.deleted': 'Grupo eliminado',
+  'groups.deleteFailed': 'No se pudo eliminar el grupo',
+  'groups.noneTitle': 'Todavía no hay grupos',
+  'groups.noneBody':
+    'Los grupos organizan los perfiles por propósito o por cliente. Asigna un perfil a un grupo al crearlo o editarlo.',
+  'groups.createFirst': 'Crear un grupo',
+  'groups.editAria': 'Editar {name}',
+  'groups.deleteAria': 'Eliminar {name}',
+  'groups.deleteTitle': 'Eliminar grupo',
+  'groups.deleteBody':
+    'Se eliminará "{name}". Sus {count} perfil(es) se conservan y quedan sin grupo.',
+  'col.description': 'DESCRIPCIÓN',
+  'col.profiles': 'PERFILES',
+
+  'schedules.title': 'Programaciones',
+  'schedules.new': 'Nueva programación',
+  'schedules.editTitle': 'Editar programación',
+  'schedules.createSubmit': 'Crear programación',
+  'schedules.formHint':
+    'Las horas se leen en el reloj del servidor — la máquina que ejecuta camoufox-pm.',
+  'schedules.noneTitle': 'Nada programado',
+  'schedules.noneBody':
+    'Abre el navegador de un perfil de forma programada, o mantén al día la versión del navegador que tiene fijada. Las ejecuciones perdidas mientras la app está cerrada se omiten, no se reponen.',
+  'schedules.createFirst': 'Crear una programación',
+  'schedules.chooseProfile': 'Elige un perfil',
+  'schedules.updated': 'Programación actualizada',
+  'schedules.created': 'Programación creada',
+  'schedules.updateFailed': 'No se pudo actualizar la programación',
+  'schedules.createFailed': 'No se pudo crear la programación',
+  'schedules.pausedToast': 'Programación pausada',
+  'schedules.resumedToast': 'Programación reanudada',
+  'schedules.ran': 'La tarea se ejecutó',
+  'schedules.skippedToast': 'La tarea se omitió',
+  'schedules.failed': 'La tarea falló',
+  'schedules.runFailed': 'No se pudo ejecutar la tarea',
+  'schedules.deleted': 'Programación eliminada',
+  'schedules.deleteFailed': 'No se pudo eliminar la programación',
+  'schedules.historyFailed': 'No se pudo cargar el historial',
+  'schedules.deletedProfile': 'eliminado',
+  'schedules.sessionMinutes': 'sesión de {n}m',
+  'schedules.pausedCell': 'pausada',
+  'schedules.runAria': 'Ejecutar {name} ahora',
+  'schedules.pauseAria': 'Pausar la programación',
+  'schedules.resumeAria': 'Reanudar la programación',
+  'schedules.historyAria': 'Historial de ejecuciones',
+  'schedules.editAria': 'Editar la programación',
+  'schedules.deleteAria': 'Eliminar la programación',
+  'schedules.profile': 'Perfil',
+  'schedules.task': 'Tarea',
+  'schedules.actionLaunch': 'Abrir el navegador',
+  'schedules.actionRefresh': 'Actualizar la versión del navegador',
+  'schedules.actionLaunchLong': 'Abrir el navegador — calentar el perfil con una sesión',
+  'schedules.actionRefreshLong':
+    'Actualizar la versión del navegador — mantener al día el navegador de la máquina fijada',
+  'schedules.refreshHint':
+    'Mueve solo la versión del navegador a la instalada; la pantalla, la GPU, los núcleos y las semillas quedan igual. Regenerar el hardware mismo no se puede programar a propósito — convertiría el perfil en una máquina nueva por temporizador.',
+  'schedules.launchHint':
+    'Se abre por el mismo gestor de sesiones que el botón Iniciar; si el navegador ya está en ejecución, la ejecución se omite.',
+  'schedules.repeats': 'Repetición',
+  'schedules.daily': 'Diario a una hora',
+  'schedules.interval': 'Cada N minutos',
+  'schedules.everyMinutes': 'Cada (minutos)',
+  'schedules.atServerTime': 'A las (hora del servidor)',
+  'schedules.onDays': 'En los días (ninguno = todos)',
+  'schedules.closeAfter': 'Cerrar después de (minutos, vacío = dejar abierto)',
+  'schedules.leaveOpen': 'Dejar el navegador abierto',
+  'schedules.historyTitle': 'Historial de ejecuciones',
+  'schedules.historySubtitle':
+    '{profile} · {action} · más recientes primero, se guardan las últimas 20',
+  'schedules.noRuns': 'Todavía no hay ejecuciones registradas.',
+  'schedules.deleteTitle': 'Eliminar programación',
+  'schedules.deleteBody':
+    'Se eliminará la programación de {action} de "{profile}" junto con su historial. El perfil mismo no se toca.',
+  'col.profile': 'PERFIL',
+  'col.task': 'TAREA',
+  'col.when': 'CUÁNDO',
+  'col.nextRun': 'PRÓXIMA',
+  'col.lastRun': 'ÚLTIMA',
+  'outcome.ok': 'ok',
+  'outcome.skipped': 'omitida',
+  'outcome.error': 'error',
+  'outcome.missed': 'perdida',
+  'day.mon': 'Lun',
+  'day.tue': 'Mar',
+  'day.wed': 'Mié',
+  'day.thu': 'Jue',
+  'day.fri': 'Vie',
+  'day.sat': 'Sáb',
+  'day.sun': 'Dom',
+  'when.everyDays': 'cada {n}d',
+  'when.everyHours': 'cada {n}h',
+  'when.everyMinutes': 'cada {n}m',
+  'when.dailyAt': 'diario a las {time}',
+
+  'settings.title': 'Ajustes',
+  'settings.keySaved': 'Clave de API guardada',
+  'settings.keyCleared': 'Clave de API borrada',
+  'settings.keyNote': 'Se guarda solo en este navegador y se envía como X-API-Key.',
+  'settings.security': 'Seguridad',
+  'settings.securityNote':
+    'Se configura con variables de entorno; reinicia para aplicar los cambios.',
+  'settings.encryption': 'Cifrado de contraseñas de proxy',
+  'settings.encryptionOn': 'Las contraseñas se cifran en reposo con CPM_SECRET_KEY.',
+  'settings.encryptionOff':
+    'Las contraseñas se guardan en texto plano. Define CPM_SECRET_KEY para cifrarlas.',
+  'settings.userAccounts': 'Cuentas de usuario',
+  'settings.userAccountsOn':
+    'Se requiere iniciar sesión. Administra las cuentas con: camoufox-pm user',
+  'settings.userAccountsOff':
+    'Sin cuentas de usuario. Crea una con: camoufox-pm user add <nombre>',
+  'settings.apiKey': 'Clave de API',
+  'settings.apiKeyOn': 'Las solicitudes deben enviar un encabezado X-API-Key que coincida.',
+  'settings.apiKeyOffAuth':
+    'No hay clave de API. Los clientes automáticos no tienen entrada; las personas inician sesión.',
+  'settings.apiKeyOffOpen':
+    'No hay clave de API. Cualquiera que alcance este puerto puede usar la API.',
+  'settings.browserKey': 'La clave de este navegador',
+  'settings.keyPlaceholder': 'Pega CPM_API_KEY para seguir usando esta interfaz',
+  'settings.keyAria': 'Clave de API para este navegador',
+  'settings.saveKey': 'Guardar',
+  'settings.boundTo': 'Escuchando en',
+  'settings.reachable': 'accesible fuera de esta máquina',
+  'settings.instance': 'Instancia',
+  'settings.version': 'Versión',
+  'settings.uptime': 'Tiempo activo',
+  'settings.database': 'Base de datos',
+  'settings.camoufox': 'Navegador Camoufox',
+  'settings.camoufoxOn': 'Instalado y listo para abrir perfiles.',
+  'settings.camoufoxOff': 'No está instalado. Ejecuta: camoufox fetch',
+  'settings.usage': 'Uso',
+  'settings.profiles': 'Perfiles',
+  'settings.groups': 'Grupos',
+  'settings.runningBrowsers': 'Navegadores en ejecución',
+  'settings.memoryDisk': 'Memoria / disco',
+
   'generic.of': 'de',
   'generic.selected': 'seleccionados',
 }
@@ -216,12 +968,22 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, es }
 
 // --- Context ----------------------------------------------------------------
 
-type Vars = Record<string, string | number>
+export type Vars = Record<string, string | number>
+
+/**
+ * The translate function, as a type.
+ *
+ * Exported because a few strings are produced by plain helpers rather than
+ * components — relative times, the reading of a proxy check — and a helper
+ * cannot call a hook. Those take `t` as an argument instead, and making it
+ * required means the compiler finds any caller that would skip translation.
+ */
+export type Translate = (key: MessageKey, vars?: Vars) => string
 
 interface I18nValue {
   locale: Locale
   setLocale: (next: Locale) => void
-  t: (key: MessageKey, vars?: Vars) => string
+  t: Translate
 }
 
 const I18nContext = createContext<I18nValue | null>(null)
@@ -247,6 +1009,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       // Private mode, or storage disabled. English it is.
     }
     if (stored && stored in MESSAGES) {
+      // localStorage is the external system here, and it cannot be read during
+      // render without the first client render disagreeing with the prerendered
+      // markup. One extra render on mount is the price of not hydrate-mismatching.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocaleState(stored as Locale)
     }
   }, [])

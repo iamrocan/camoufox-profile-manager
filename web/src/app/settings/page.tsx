@@ -12,6 +12,7 @@ import {
   type SystemConfig,
   type SystemStatus,
 } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 
 function formatUptime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [key, setKey] = useState('')
   const toast = useToast()
+  const t = useT()
 
   useEffect(() => {
     // The key lives in localStorage, which does not exist when this page is
@@ -48,113 +50,108 @@ export default function SettingsPage() {
     setApiKey(key.trim())
     toast(
       'ok',
-      key.trim() ? 'API key saved' : 'API key cleared',
-      'Stored in this browser only, and sent as X-API-Key.',
+      t(key.trim() ? 'settings.keySaved' : 'settings.keyCleared'),
+      t('settings.keyNote'),
     )
   }
 
   return (
     <>
       <header className="sticky top-0 z-20 flex h-[52px] items-center gap-3 border-b border-line bg-canvas/85 px-5 backdrop-blur">
-        <h1 className="text-[14px] font-semibold">Settings</h1>
+        <h1 className="text-[14px] font-semibold">{t('settings.title')}</h1>
       </header>
 
       {error ? (
-        <EmptyState icon={<SettingsIcon size={18} />} title="Cannot reach the API" body={error} />
+        <EmptyState icon={<SettingsIcon size={18} />} title={t('empty.apiTitle')} body={error} />
       ) : !config ? (
-        <p className="px-5 py-8 text-ink-faint">Loading…</p>
+        <p className="px-5 py-8 text-ink-faint">{t('profiles.loading')}</p>
       ) : (
         <div className="mx-auto flex max-w-[760px] flex-col gap-6 px-5 py-6">
           {/* Security first: these two decide whether this instance is safe to expose. */}
-          <Group
-            title="Security"
-            note="Configured with environment variables; restart to apply changes."
-          >
+          <Group title={t('settings.security')} note={t('settings.securityNote')}>
             <Toggle
               on={config.encryption_enabled}
-              label="Proxy password encryption"
-              onText="Passwords are encrypted at rest with CPM_SECRET_KEY."
-              offText="Passwords are stored as plain text. Set CPM_SECRET_KEY to encrypt them."
+              label={t('settings.encryption')}
+              onText={t('settings.encryptionOn')}
+              offText={t('settings.encryptionOff')}
               warnWhenOff
             />
             <Toggle
               on={config.user_auth_enabled}
-              label="User accounts"
-              onText="Login is required. Manage accounts with: camoufox-pm user"
-              offText="No user accounts. Create one with: camoufox-pm user add <name>"
+              label={t('settings.userAccounts')}
+              onText={t('settings.userAccountsOn')}
+              offText={t('settings.userAccountsOff')}
               warnWhenOff={config.host !== '127.0.0.1' && !config.api_key_set}
             />
             <Toggle
               on={config.api_key_set}
-              label="API key"
-              onText="Requests must send a matching X-API-Key header."
-              offText={
-                config.user_auth_enabled
-                  ? 'No API key is set. Machine clients have no way in; humans log in.'
-                  : 'No API key is set. Anyone who can reach this port can use the API.'
-              }
+              label={t('settings.apiKey')}
+              onText={t('settings.apiKeyOn')}
+              offText={t(
+                config.user_auth_enabled ? 'settings.apiKeyOffAuth' : 'settings.apiKeyOffOpen',
+              )}
               warnWhenOff={config.host !== '127.0.0.1' && !config.user_auth_enabled}
             />
             {config.api_key_set && (
               <form onSubmit={saveKey} className="flex items-start gap-4 px-4 py-2.5">
-                <span className="w-[150px] shrink-0 text-ink-dim">This browser&apos;s key</span>
+                <span className="w-[150px] shrink-0 text-ink-dim">{t('settings.browserKey')}</span>
                 <span className="flex flex-1 gap-2">
                   <input
                     type="password"
                     className="field font-mono"
                     value={key}
                     onChange={(event) => setKey(event.target.value)}
-                    placeholder="Paste CPM_API_KEY to keep using this UI"
-                    aria-label="API key for this browser"
+                    placeholder={t('settings.keyPlaceholder')}
+                    aria-label={t('settings.keyAria')}
                     autoComplete="off"
                   />
                   <button type="submit" className="btn btn-default shrink-0">
-                    Save
+                    {t('settings.saveKey')}
                   </button>
                 </span>
               </form>
             )}
-            <Row label="Bound to">
+            <Row label={t('settings.boundTo')}>
               <span className="font-mono">
                 {config.host}:{config.port}
               </span>
               {config.host !== '127.0.0.1' && (
-                <span className="ml-2 text-danger">reachable beyond this machine</span>
+                <span className="ml-2 text-danger">{t('settings.reachable')}</span>
               )}
             </Row>
           </Group>
 
-          <Group title="Instance">
-            <Row label="Version">
+          <Group title={t('settings.instance')}>
+            <Row label={t('settings.version')}>
               <span className="font-mono">{config.version}</span>
             </Row>
-            <Row label="Uptime">
+            <Row label={t('settings.uptime')}>
               <span className="font-mono">{formatUptime(config.uptime_seconds)}</span>
             </Row>
-            <Row label="Database">
+            <Row label={t('settings.database')}>
               <span className="break-all font-mono text-ink-dim">{config.database_path}</span>
             </Row>
             <Toggle
               on={config.camoufox_available}
-              label="Camoufox browser"
-              onText="Installed and ready to launch profiles."
-              offText="Not installed. Run: camoufox fetch"
+              label={t('settings.camoufox')}
+              onText={t('settings.camoufoxOn')}
+              offText={t('settings.camoufoxOff')}
               warnWhenOff
             />
           </Group>
 
           {status && (
-            <Group title="Usage">
-              <Row label="Profiles">
+            <Group title={t('settings.usage')}>
+              <Row label={t('settings.profiles')}>
                 <span className="font-mono">{status.total_profiles}</span>
               </Row>
-              <Row label="Groups">
+              <Row label={t('settings.groups')}>
                 <span className="font-mono">{status.total_groups}</span>
               </Row>
-              <Row label="Running browsers">
+              <Row label={t('settings.runningBrowsers')}>
                 <span className="font-mono">{status.running_browsers}</span>
               </Row>
-              <Row label="Memory / disk">
+              <Row label={t('settings.memoryDisk')}>
                 <span className="font-mono text-ink-dim">
                   {Math.round(status.memory_usage)}% / {Math.round(status.disk_usage)}%
                 </span>
