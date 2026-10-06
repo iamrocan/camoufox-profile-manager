@@ -44,6 +44,30 @@ MIN_PYTHON = (3, 10)
 IS_WINDOWS = os.name == "nt"
 
 
+def setup_console() -> None:
+    """Make the Windows console able to print the accents in this script.
+
+    A fresh console is on a legacy code page, where every accented character in
+    the output arrives as a replacement glyph: an installer whose first line is
+    already mangled does not inspire much confidence in the rest. Both halves
+    are needed -- the code page so the console can render UTF-8, and the stream
+    reconfiguration so Python emits it -- and errors="replace" keeps a console
+    that refuses both from turning a cosmetic problem into a crash.
+    """
+    if IS_WINDOWS:
+        try:
+            import ctypes
+
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        except Exception:
+            pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+
+
 # --- output ------------------------------------------------------------------
 #
 # Numbered steps, because the two slow ones (dependency resolution and the
@@ -139,8 +163,25 @@ def fetch_code(target: Path) -> bool:
 
     if git:
         step(f"Clonando el repositorio en {target}")
+        warn_if_path_is_long(target)
         target.parent.mkdir(parents=True, exist_ok=True)
-        run([git, "clone", "--depth", "1", REPO_URL, str(target)], what="git clone")
+        # core.longpaths because the committed UI bundle has deeply nested files
+        # with hashed names, and without it Windows refuses the checkout at 260
+        # characters -- leaving a repo with a .git directory and no working tree.
+        clone = [
+            git, "-c", "core.longpaths=true",
+            "clone", "--depth", "1", REPO_URL, str(target),
+        ]
+        info(f"$ {subprocess.list2cmdline(clone)}")
+        if subprocess.run(clone).returncode != 0:
+            # A half-checked-out clone is worse than none: it has a valid .git,
+            # so a re-run would take the update path over a broken tree.
+            remove_partial(target)
+            die(
+                "git clone falló",
+                hint="Si el error fue 'Filename too long', elige una carpeta con "
+                "una ruta más corta con --dir, por ejemplo C:/Camoufox.",
+            )
         return True
 
     step(f"Descargando el repositorio en {target} (git no está instalado)")
@@ -150,6 +191,23 @@ def fetch_code(target: Path) -> bool:
     )
     download_zip(target)
     return False
+
+
+def warn_if_path_is_long(target: Path) -> None:
+    """The bundle's longest inner path is ~75 characters below the repo root."""
+    headroom = 260 - len(str(target)) - 80
+    if headroom < 0:
+        warn(
+            f"La ruta {target} es larga; en Windows el límite es 260 caracteres "
+            "y algunos archivos de la interfaz podrían no caber. Si falla, usa "
+            "--dir con una ruta más corta."
+        )
+
+
+def remove_partial(target: Path) -> None:
+    if target.exists():
+        info(f"Limpiando la instalación incompleta en {target}")
+        shutil.rmtree(target, ignore_errors=True)
 
 
 def download_zip(target: Path) -> None:
@@ -430,6 +488,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    setup_console()
     target = (args.dir or default_target()).expanduser().resolve()
 
     print("=" * 70)
