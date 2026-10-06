@@ -231,6 +231,10 @@ class Profile(BaseModel):
 
     browser_settings: BrowserSettings = Field(default_factory=BrowserSettings)
     proxy: ProxyConfig | None = None
+    # When True the launcher ignores `proxy` and starts the browser direct.
+    # Set from the UI's "Pause proxy" menu item; the proxy_config itself is
+    # kept so "Resume proxy" is a one-click put-back.
+    proxy_paused: bool = False
     extensions: list[str] = Field(default_factory=list)
     storage_path: str | None = None
     notes: str | None = None
@@ -297,8 +301,24 @@ class Profile(BaseModel):
             options["window"] = (bs.window_width, bs.window_height)
         if bs.fonts:
             options["fonts"] = bs.fonts
-        if self.proxy:
+        if self.proxy and not self.proxy_paused:
             options["proxy"] = self.proxy.to_camoufox_format()
+        elif self.proxy and self.proxy_paused:
+            # Omitting `proxy` from the launch options is not enough: Firefox
+            # persists network.proxy.* in prefs.js between launches, so a
+            # profile that was launched with a proxy once will keep using it
+            # until something explicitly turns it off. Force type=0 (no proxy)
+            # AND blank the per-protocol host/port keys that Playwright may
+            # have persisted, so neither path keeps routing through the proxy.
+            prefs = options.setdefault("firefox_user_prefs", {})
+            prefs["network.proxy.type"] = 0
+            prefs["network.proxy.http"] = ""
+            prefs["network.proxy.http_port"] = 0
+            prefs["network.proxy.ssl"] = ""
+            prefs["network.proxy.ssl_port"] = 0
+            prefs["network.proxy.socks"] = ""
+            prefs["network.proxy.socks_port"] = 0
+            prefs["network.proxy.share_proxy_settings"] = False
         return options
 
 

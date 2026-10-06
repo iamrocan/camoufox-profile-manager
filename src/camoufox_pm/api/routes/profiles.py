@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from loguru import logger
 from pydantic import ValidationError
 from starlette.background import BackgroundTask
@@ -787,6 +787,233 @@ async def import_profiles_from_excel(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Failed to import profiles from Excel: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post(
+    "/profiles/{profile_id}/proxy/toggle",
+    response_model=ProfileResponse,
+    operation_id="toggle_profile_proxy",
+    summary="Pause or resume the profile's proxy.",
+    description=(
+        "Flips the proxy_paused flag. When true the next launch starts the "
+        "browser without the proxy, even if proxy_config is set. The proxy "
+        "config itself is preserved. Returns the updated profile. 400 if the "
+        "profile has no proxy configured."
+    ),
+)
+async def toggle_profile_proxy(profile_id: str):
+    """Toggle whether the launcher honors the profile's proxy."""
+    try:
+        profile_manager = get_profile_manager()
+        profile = await profile_manager.get_profile(profile_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail=f"Profile with ID {profile_id} not found")
+        updated = await profile_manager.set_proxy_paused(profile_id, not profile.proxy_paused)
+        return ProfileResponse.from_profile(updated)
+    except HTTPException:
+        raise
+    except StaleWriteError:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Failed to toggle proxy for profile {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post(
+    "/profiles/{profile_id}/clear-data",
+    operation_id="clear_profile_data",
+    summary="Clear a profile's browser data.",
+    description=(
+        "Wipe cookies, cache, history, local/session storage, downloads and "
+        "sessionstore from the profile's user_data_dir. The pinned fingerprint, "
+        "proxy, group and all settings are kept — the profile keeps its "
+        "identity but opens like a fresh install on the next launch. "
+        "Refuses while the browser is open (409)."
+    ),
+)
+async def clear_profile_data(profile_id: str):
+    """Clear browsing data (cookies, cache, history, ...) for a profile."""
+    try:
+        profile_manager = get_profile_manager()
+        result = await profile_manager.clear_profile_data(profile_id)
+        logger.info(f"Cleared data for profile: {profile_id}")
+        return result
+    except ValueError as e:
+        msg = str(e)
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from e
+        raise HTTPException(status_code=409, detail=msg) from e
+    except ProfileLocked:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to clear data for profile {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+_CLEAR_DATA_UI_HTML = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clear profile data — Camoufox</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+         background: #0f0f10; color: #e5e5e5; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: #999; margin: 0 0 20px; font-size: 13px; max-width: 640px; }
+  .bar { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+  button { background: #ff8c00; color: #111; border: 0; padding: 9px 14px;
+           border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
+  button.ghost { background: transparent; color: #ddd; border: 1px solid #444; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #262626;
+           font-size: 13px; }
+  th { color: #999; font-weight: 500; font-size: 12px; text-transform: uppercase;
+       letter-spacing: 0.05em; }
+  tr:hover td { background: #1a1a1b; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px;
+          background: #262626; font-size: 11px; color: #aaa; }
+  .row-btn { background: #262626; color: #e5e5e5; padding: 5px 10px; font-size: 12px; }
+  .row-btn:hover { background: #ff8c00; color: #111; }
+  input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+  #toast { position: fixed; bottom: 20px; right: 20px; background: #262626;
+           border: 1px solid #444; border-radius: 6px; padding: 12px 16px;
+           font-size: 13px; max-width: 420px; transition: opacity .3s;
+           opacity: 0; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #toast.ok   { border-color: #2d7a2d; }
+  #toast.err  { border-color: #a33; }
+  .hint { color: #666; font-size: 12px; margin-top: 24px; }
+  a { color: #ff8c00; }
+</style>
+</head>
+<body>
+<h1>Clear browser data</h1>
+<p class="sub">Wipes cookies, cache, history, local/session storage and downloads
+from the selected profiles. The fingerprint, proxy and settings are kept — each
+profile keeps its identity but opens like a fresh install on the next launch.
+Profiles whose browser is open are refused with 409.</p>
+<div class="bar">
+  <button id="refresh" class="ghost">Refresh</button>
+  <button id="clearSel" disabled>Clear selected</button>
+  <span id="count" style="align-self:center;color:#888;font-size:13px;"></span>
+</div>
+<table>
+  <thead><tr>
+    <th style="width:28px;"><input type="checkbox" id="all"></th>
+    <th>Name</th><th>Group</th><th>Status</th><th style="text-align:right;">Action</th>
+  </tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+<p class="hint">Tip: back to the main UI → <a href="/">home</a>.</p>
+<div id="toast"></div>
+<script>
+const tbody = document.getElementById('tbody');
+const allCb = document.getElementById('all');
+const clearBtn = document.getElementById('clearSel');
+const refresh = document.getElementById('refresh');
+const countEl = document.getElementById('count');
+const toastEl = document.getElementById('toast');
+let profiles = [];
+
+function toast(msg, cls) {
+  toastEl.className = 'show ' + (cls || '');
+  toastEl.textContent = msg;
+  setTimeout(() => toastEl.className = '', 3500);
+}
+function selected() {
+  return [...tbody.querySelectorAll('input.row:checked')].map(e => e.dataset.id);
+}
+function updateCount() {
+  const n = selected().length;
+  clearBtn.disabled = n === 0;
+  clearBtn.textContent = n > 1 ? `Clear selected (${n})` : 'Clear selected';
+  countEl.textContent = `${profiles.length} profiles`;
+}
+async function load() {
+  tbody.innerHTML = '<tr><td colspan="5" style="color:#888;">Loading…</td></tr>';
+  try {
+    const r = await fetch('/api/v1/profiles?per_page=500');
+    const j = await r.json();
+    profiles = j.profiles || j.items || j.data?.profiles || j;
+    if (!Array.isArray(profiles)) profiles = [];
+    tbody.innerHTML = '';
+    for (const p of profiles) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" class="row" data-id="${p.id}"></td>
+        <td>${p.name || p.id}</td>
+        <td><span class="pill">${p.group || '—'}</span></td>
+        <td><span class="pill">${p.status || '—'}</span></td>
+        <td style="text-align:right;">
+          <button class="row-btn" data-id="${p.id}" data-name="${p.name || p.id}">Clear</button>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll('input.row').forEach(e => e.addEventListener('change', updateCount));
+    tbody.querySelectorAll('button.row-btn').forEach(b => b.addEventListener('click',
+      () => clearOne(b.dataset.id, b.dataset.name)));
+    updateCount();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#a33;">Load error: ${e.message}</td></tr>`;
+  }
+}
+async function clearOne(id, name) {
+  if (!confirm(`Clear browser data for "${name}"?\\n\\nFingerprint and settings are kept. This cannot be undone.`)) return;
+  try {
+    const r = await fetch(`/api/v1/profiles/${id}/clear-data`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || j.error?.message || `HTTP ${r.status}`);
+    const mb = (j.bytes_removed / 1048576).toFixed(1);
+    toast(`${name}: cleared ${j.files_removed} files (${mb} MB)`, 'ok');
+  } catch (e) {
+    toast(`${name}: ${e.message}`, 'err');
+  }
+}
+async function clearSelected() {
+  const ids = selected();
+  if (!ids.length) return;
+  if (!confirm(`Clear browser data for ${ids.length} profile(s)?\\n\\nThis cannot be undone.`)) return;
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const r = await fetch(`/api/v1/profiles/${id}/clear-data`, { method: 'POST' });
+      if (!r.ok) throw new Error();
+      ok++;
+    } catch { fail++; }
+  }
+  toast(`${ok} cleared, ${fail} failed`, fail ? 'err' : 'ok');
+}
+allCb.addEventListener('change', () => {
+  tbody.querySelectorAll('input.row').forEach(e => e.checked = allCb.checked);
+  updateCount();
+});
+clearBtn.addEventListener('click', clearSelected);
+refresh.addEventListener('click', load);
+load();
+</script>
+</body>
+</html>
+"""
+
+
+@router.get(
+    "/tools/clear-data",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+async def clear_data_ui() -> HTMLResponse:
+    """Standalone mini-UI to clear browser data per profile.
+
+    Lives next to the API because the main Next.js bundle is pre-built in
+    the release wheel and would need a Node toolchain to add a button to.
+    """
+    return HTMLResponse(_CLEAR_DATA_UI_HTML)
 
 
 @router.post(

@@ -1,6 +1,8 @@
-"""Browser profile manager."""
+﻿"""Browser profile manager."""
 
 import asyncio
+import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +12,7 @@ from loguru import logger
 
 from camoufox_pm.config import get_settings
 
-from . import fingerprint_store, profile_archive, proxy_check
+from . import fingerprint_store, local_proxy, profile_archive, proxy_check
 from .browser_session import BrowserSessionManager
 from .database import StaleWriteError, StorageManager
 from .fingerprint_generator import FingerprintGenerator
@@ -38,6 +40,10 @@ class ProfileManager:
         # renews this process's leases for as long as its browsers are open.
         self.lease_holder = make_lease_holder()
         self.browser_sessions = BrowserSessionManager(storage_manager, self.lease_holder)
+
+        # One loopback relay per running browser, so its upstream proxy can be
+        # switched off and on without a restart. See core/local_proxy.py.
+        self.local_proxies = local_proxy.LocalProxyManager()
 
         self.profiles_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Initialized ProfileManager with data directory: {self.data_dir}")
@@ -123,7 +129,7 @@ class ProfileManager:
                 profile.browser_settings.os = preset_os
 
             # The preset *is* the hardware, so generated values must not override
-            # it — an explicit hardware_concurrency wins over the preset's own and
+            # it â€” an explicit hardware_concurrency wins over the preset's own and
             # would give the profile a CPU count the real device never had. Values
             # the caller asked for are still honoured.
             asked_for = set(browser_settings) if isinstance(browser_settings, dict) else set()
@@ -137,7 +143,7 @@ class ProfileManager:
                 profile.to_camoufox_launch_options(), preset=preset
             )
             # can_resolve() only rules out a missing browser; resolution can still
-            # fail for other reasons. Check the result, not a proxy for it —
+            # fail for other reasons. Check the result, not a proxy for it â€”
             # otherwise the profile is created unpinned and its first launch
             # quietly assigns a generated machine instead of the chosen device.
             if not profile.fingerprint:
@@ -182,7 +188,7 @@ class ProfileManager:
     ) -> Profile | None:
         """Update a profile, refusing to overwrite a save we did not see.
 
-        ``expected_row_version`` is the version the *caller* read — a client
+        ``expected_row_version`` is the version the *caller* read â€” a client
         that loaded an edit form minutes ago passes the version it was shown,
         and a save that landed since makes this raise ``StaleWriteError``
         instead of reverting it. Omitted, the guard falls back to the version
@@ -235,7 +241,7 @@ class ProfileManager:
                 setattr(profile, key, value)
 
         # An answer from the proxy that was there says nothing about the one that
-        # is there now — including "no proxy at all", which is a different exit
+        # is there now â€” including "no proxy at all", which is a different exit
         # address, not the absence of one. Drop it rather than show it as current.
         if "proxy_config" in updates or "proxy" in updates:
             if profile.proxy != proxy_before:
@@ -346,7 +352,7 @@ class ProfileManager:
         profile_data["updated_at"] = datetime.now()
         profile_data["last_used"] = None
         profile_data["storage_path"] = None
-        # The copy shares the source's proxy, so the answer would still be true —
+        # The copy shares the source's proxy, so the answer would still be true â€”
         # but it would read as "this profile was checked", and it never was.
         profile_data["proxy_check"] = None
 
@@ -439,8 +445,8 @@ class ProfileManager:
         stats = await self.storage.get_profile_usage_stats(profile_id)
 
         # The keys here are the ones ProfileStatsResponse reads. They used to be
-        # named differently — total_usage_time against total_duration_minutes,
-        # and no last_session or actions at all — so the endpoint fell back to
+        # named differently â€” total_usage_time against total_duration_minutes,
+        # and no last_session or actions at all â€” so the endpoint fell back to
         # its defaults and reported every profile as never used.
         return {
             "profile_id": profile_id,
@@ -605,8 +611,8 @@ class ProfileManager:
             raise ValueError("This profile has no pinned machine yet; launch it once first.")
 
         # Resolve for the OS the *pin* describes, not the profile's current
-        # setting. The two can disagree — someone may have changed the OS dropdown
-        # after the machine was pinned — and taking the user agent from the
+        # setting. The two can disagree â€” someone may have changed the OS dropdown
+        # after the machine was pinned â€” and taking the user agent from the
         # setting would then put, say, a macOS browser on Windows hardware.
         options = profile.to_camoufox_launch_options()
         pinned_os = fingerprint_store.pinned_os(profile.fingerprint)
@@ -650,7 +656,7 @@ class ProfileManager:
         honest ways out and they cost very different amounts.
 
         ``keep_machine`` puts the setting back to the OS the pin describes and
-        touches nothing else — the profile is the computer it has always been.
+        touches nothing else â€” the profile is the computer it has always been.
         Otherwise the setting wins and a new machine is pinned for it: new screen,
         GPU, cores, fonts and noise seeds. For a warmed-up account that is a real
         cost, which is why it is never the automatic answer.
@@ -712,9 +718,9 @@ class ProfileManager:
 
         Until recently every new profile was given the timezone and coordinates of
         a randomly chosen region, so an old profile can claim Shanghai and be
-        handed a German proxy. Those profiles were deliberately not migrated —
+        handed a German proxy. Those profiles were deliberately not migrated â€”
         rewriting a stored fingerprint under a live account is worse than leaving
-        it — so this is the offer instead: the same change, made deliberately.
+        it â€” so this is the offer instead: the same change, made deliberately.
 
         Clearing the coordinates is the part that matters beyond tidiness. Their
         presence turns Camoufox's IP lookup off, and that lookup is also what
@@ -747,12 +753,119 @@ class ProfileManager:
         logger.info(f"Cleared the geography of {len(cleared)} of {len(profile_ids)} profiles")
         return {"cleared": cleared, "unchanged": unchanged, "not_found": not_found}
 
+    async def set_proxy_paused(self, profile_id: str, paused: bool) -> Profile:
+        """Toggle whether the launcher ignores the profile's proxy_config.
+
+        The proxy itself is kept, so resuming is a one-click put-back. Only
+        affects *future* launches: a browser already open on this profile
+        keeps whatever proxy it started with (that is what the in-browser
+        extension is for â€” flipping the live session without a restart).
+        """
+        profile = await self.get_profile(profile_id)
+        if not profile:
+            raise ValueError(f"Profile with ID {profile_id} not found")
+        if not profile.proxy:
+            raise ValueError("This profile has no proxy to pause")
+
+        if profile.proxy_paused == paused:
+            return profile  # no-op, no bump
+
+        profile.proxy_paused = paused
+        profile.updated_at = datetime.now()
+        # Version-checked: a save that lands in between would otherwise be
+        # reverted â€” same rationale as clear_geography above.
+        await self.storage.update_profile(profile, expected_row_version=profile.row_version)
+
+        # If a browser is open on this profile, its loopback relay is what
+        # decides where the traffic goes, so flip that too and the change
+        # lands without a restart. set_paused drops the open tunnels, so the
+        # next request takes the new route.
+        live = self.local_proxies.set_paused(profile_id, paused)
+
+        await self.storage.log_usage(
+            UsageStats(
+                profile_id=profile_id,
+                action="proxy_paused" if paused else "proxy_resumed",
+                details={"applied_live": live},
+            )
+        )
+        logger.info(
+            f"Proxy {'paused' if paused else 'resumed'} for profile {profile_id}"
+            f"{' (applied to the running browser)' if live else ''}"
+        )
+        return profile
+
+    async def clear_profile_data(self, profile_id: str) -> dict[str, Any]:
+        """Wipe a profile's browser data (cookies, cache, history, storage,
+        session, downloads, ...) while leaving the profile's identity intact.
+
+        Preserved:
+          * The pinned fingerprint, group, proxy, browser_settings, notes â€”
+            all of which live in the SQLite database, not in storage_path.
+
+        Removed: everything inside storage_path (the Firefox user_data_dir).
+        Firefox recreates whatever it needs on the next launch, so the
+        profile keeps its name, id and machine but opens like a fresh install
+        â€” no logged-in sites, no history, no cache.
+
+        Refuses while the browser is open (local session OR a fleet-wide
+        lease held by another instance), by the same reasoning as
+        export_profile: wiping files mid-write corrupts the running session.
+        """
+        profile = await self.get_profile(profile_id)
+        if not profile:
+            raise ValueError(f"Profile with ID {profile_id} not found")
+
+        if self.browser_sessions.is_running(profile_id):
+            raise ValueError("Close the browser before clearing this profile's data")
+
+        lease = await self.storage.get_lease(profile_id)
+        if lease is not None and lease[0] not in (None, self.lease_holder):
+            if not lease_expired(lease[1]):
+                raise ProfileLocked(profile_id, lease[0])
+
+        data_dir = Path(profile.get_storage_path(str(self.profiles_dir)))
+
+        bytes_removed = 0
+        files_removed = 0
+        if data_dir.exists():
+            for entry in data_dir.rglob("*"):
+                if entry.is_file():
+                    try:
+                        bytes_removed += entry.stat().st_size
+                        files_removed += 1
+                    except OSError:
+                        pass
+            shutil.rmtree(data_dir, ignore_errors=False)
+
+        # Recreate the directory empty so the next launch has a valid
+        # user_data_dir and does not race with Camoufox trying to mkdir it.
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        await self.storage.log_usage(
+            UsageStats(
+                profile_id=profile_id,
+                action="clear_profile_data",
+                details={"bytes_removed": bytes_removed, "files_removed": files_removed},
+            )
+        )
+        logger.info(
+            f"Cleared browser data for profile {profile_id} "
+            f"({files_removed} files, {bytes_removed} bytes)"
+        )
+        return {
+            "profile_id": profile_id,
+            "profile_name": profile.name,
+            "bytes_removed": bytes_removed,
+            "files_removed": files_removed,
+        }
+
     # -- Portability --------------------------------------------------------
 
     async def export_profile(self, profile_id: str, destination: Path) -> Path:
         """Write a profile and its browser data to an archive.
 
-        Refuses while the browser is open — here or on any other instance —
+        Refuses while the browser is open â€” here or on any other instance â€”
         because the databases would be copied mid-write and the restored
         profile could come back corrupted.
         """
@@ -764,7 +877,7 @@ class ProfileManager:
         # The lease is the fleet-wide half of that check: active_sessions only
         # knows about browsers this process started, so without it an export on
         # one machine would copy the databases of a profile running on another,
-        # mid-write. An expired lease reads as free — that machine is gone.
+        # mid-write. An expired lease reads as free â€” that machine is gone.
         lease = await self.storage.get_lease(profile_id)
         if lease is not None and lease[0] not in (None, self.lease_holder):
             if not lease_expired(lease[1]):
@@ -792,7 +905,7 @@ class ProfileManager:
         profile.group = None
         # The archive may carry a proxy check made on another machine, on another
         # network, at some point in the past. Whatever it said, it did not say it
-        # here — same reasoning as a clone, and stronger.
+        # here â€” same reasoning as a clone, and stronger.
         profile.proxy_check = None
         data_dir = Path(profile.get_storage_path(str(self.profiles_dir)))
 
@@ -848,7 +961,7 @@ class ProfileManager:
         # Everything from here to a launched browser runs on that lease, and if
         # any of it raises the lease has to go back before the error escapes.
         # Otherwise the profile is locked for a full TTL with no browser running
-        # anywhere — worse than having no leases at all.
+        # anywhere â€” worse than having no leases at all.
         #
         # On success it is deliberately kept: the session owns it until the
         # browser closes (or the process exits, where the API lifespan calls
@@ -920,6 +1033,62 @@ class ProfileManager:
             # between reading the profile and saving it.
             await proxy_check.fill_what_geoip_would_have(profile.proxy, options)
 
+            # Route through a loopback proxy we control, so the upstream can
+            # be switched off and back on while the browser runs. Playwright
+            # sets Firefox's proxy below the WebExtension layer, so nothing
+            # inside the browser can do this — both proxy.settings and
+            # proxy.onRequest were measured against a live page and neither
+            # could override it. Giving Playwright a local address instead
+            # moves the decision somewhere we can still reach.
+            #
+            # Credentials stop at this process as a side effect: the browser
+            # is handed a loopback address with no auth on it.
+            upstream = local_proxy.upstream_from_config(profile.proxy)
+            if upstream is not None:
+                port = await self.local_proxies.start(
+                    profile_id, upstream, paused=bool(profile.proxy_paused)
+                )
+                options["proxy"] = {"server": f"http://127.0.0.1:{port}"}
+                # The relay owns the paused/active decision now, so the
+                # "turn the proxy off" prefs that to_camoufox_launch_options
+                # adds for a paused profile have to go: leaving them would
+                # bypass the relay entirely and resuming would do nothing.
+                prefs = options.get("firefox_user_prefs")
+                if prefs:
+                    for key in list(prefs):
+                        if key.startswith("network.proxy."):
+                            del prefs[key]
+                    if not prefs:
+                        options.pop("firefox_user_prefs", None)
+                logger.info(
+                    f"Routing {profile_id} through local proxy 127.0.0.1:{port} "
+                    f"({'paused' if profile.proxy_paused else 'upstream'})"
+                )
+            elif profile.proxy is not None and not profile.proxy_paused:
+                # SOCKS (or an unparseable server): hand it to Playwright as
+                # before. Everything works except flipping it while running.
+                logger.info(
+                    f"{profile_id} uses a proxy the local relay cannot carry "
+                    "(SOCKS?); live pause will not be available"
+                )
+
+            # Attach the proxy-toggle WebExtension. Its button now just calls
+            # the manager's toggle endpoint, which flips the local proxy.
+            if profile.proxy is not None:
+                ext_dir = _prepare_proxy_toggle_extension(profile)
+                if ext_dir:
+                    addons = list(options.get("addons") or [])
+                    addons.append(ext_dir)
+                    options["addons"] = addons
+                    logger.info(
+                        f"proxy-toggle extension attached for {profile_id}: {ext_dir}"
+                    )
+                else:
+                    logger.warning(
+                        f"proxy-toggle extension NOT attached for {profile_id} "
+                        "(template missing or deploy failed — see earlier warning)"
+                    )
+
             session = await self.browser_sessions.launch(
                 profile_id, options, on_exit=self._on_browser_exit
             )
@@ -948,6 +1117,10 @@ class ProfileManager:
     async def _on_browser_exit(self, profile_id: str) -> None:
         """Record usage when a browser exits on its own (e.g. the user closes it)."""
         try:
+            await self.local_proxies.stop(profile_id)
+        except Exception as exc:  # noqa: BLE001 - teardown must not break
+            logger.warning(f"Failed to stop the local proxy for {profile_id}: {exc}")
+        try:
             await self.storage.log_usage(
                 UsageStats(profile_id=profile_id, action="close_browser", details={"forced": False})
             )
@@ -956,6 +1129,7 @@ class ProfileManager:
 
     async def close_browser(self, profile_id: str) -> dict[str, Any]:
         """Close the browser running for a profile, and hand its lease back."""
+        await self.local_proxies.stop(profile_id)
         closed = await self.browser_sessions.close_and_release(profile_id)
         if not closed:
             return {
@@ -998,7 +1172,7 @@ class ProfileManager:
             logger.warning(f"Failed to release the lease on {profile_id}: {exc}")
 
     async def release_all_leases(self) -> None:
-        """Hand back every lease this process holds — the exit counterpart to launch.
+        """Hand back every lease this process holds â€” the exit counterpart to launch.
 
         Without it a clean shutdown leaves leases standing for their full TTL,
         locking this instance's profiles against the whole fleet, including
@@ -1019,3 +1193,58 @@ class ProfileManager:
             if self.browser_sessions.is_live(entry["id"]):
                 continue
             await self._release_lease_quietly(entry["id"])
+
+
+# --- Proxy-toggle WebExtension ---------------------------------------------
+#
+# Deploys a per-launch copy of the proxy-toggle extension into the profile's
+# user_data_dir, with a config.json carrying the profile's id and current
+# proxy_paused flag. The copy exists so that two browsers running at once
+# cannot step on each other's config.json; it is replaced every launch and
+# does not survive a `clear_profile_data` (which is fine — the next launch
+# just rebuilds it).
+
+def _bundled_extension_dir() -> Path | None:
+    """Find the template directory of the proxy-toggle extension.
+
+    An env var wins, then the per-install copy inside the package.
+    """
+    override = os.environ.get("CPM_PROXY_TOGGLE_EXT_DIR")
+    if override and Path(override).is_dir():
+        return Path(override)
+    guess = Path(__file__).resolve().parent.parent / "_bundled_ext" / "proxy-toggle"
+    return guess if guess.is_dir() else None
+
+
+def _prepare_proxy_toggle_extension(profile) -> str | None:
+    """Copy the extension template into the profile and inject its config.
+
+    Returns an ABSOLUTE path to pass as a Camoufox addon, or None if the
+    template is not deployed (apply_patch.ps1 skipped, or dev install).
+
+    Absolute is deliberate: Camoufox serializes the path through an env var
+    the browser process reads, and that process does not inherit the
+    launcher's CWD, so a relative path like "data/profiles/..." silently
+    resolves to the browser's own working directory and finds no manifest.
+    """
+    template = _bundled_extension_dir()
+    if template is None:
+        logger.warning("proxy-toggle template not found in package; skipping")
+        return None
+    storage = Path(profile.get_storage_path()).resolve()
+    storage.mkdir(parents=True, exist_ok=True)
+    dst = (storage / "_proxy_toggle_ext").resolve()
+    try:
+        if dst.exists():
+            shutil.rmtree(dst, ignore_errors=True)
+        shutil.copytree(template, dst)
+        cfg = {
+            "profile_id": profile.id,
+            "manager_url": os.environ.get("CPM_MANAGER_URL", "http://127.0.0.1:8000"),
+            "proxy_paused": bool(getattr(profile, "proxy_paused", False)),
+        }
+        (dst / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+        return str(dst)
+    except Exception as exc:  # noqa: BLE001 - never block a launch over this
+        logger.warning(f"Could not deploy proxy-toggle extension: {exc}")
+        return None

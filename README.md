@@ -1,5 +1,57 @@
 # Camoufox Profile Manager
 
+> ### This is a fork
+>
+> Based on [polyackiy/camoufox-profile-manager](https://github.com/polyackiy/camoufox-profile-manager)
+> `v0.5.0` (MIT). It fixes one bug and adds two features. Everything below this
+> box is the upstream README.
+>
+> **Fix — real device presets on Windows.** Camoufox splits its config across
+> `CAMOU_CONFIG_1..n` env vars at 2047 bytes on Windows, but upstream reads only
+> the first chunk and parses it as a whole JSON document. Every captured device
+> preset is larger than that, so creating a profile from one failed with
+> *"Unterminated string"* on every Windows install. The chunks are now
+> reassembled before parsing. (Some presets still fail with *"No WebGL data
+> found"* — that is missing data in Camoufox itself, not here.)
+>
+> **Clear browser data.** *Clear data* in a profile's row menu wipes cookies,
+> cache, history, local/session storage and downloads, and keeps the pinned
+> fingerprint, proxy, group and settings — those live in SQLite, not in the
+> profile directory. The profile keeps its identity and opens like a fresh
+> install. Refuses while the browser is open. Also at
+> `POST /api/v1/profiles/{id}/clear-data`, and as a standalone page at
+> `/api/v1/tools/clear-data` for doing several at once.
+>
+> **Pause the proxy, including while the browser runs.** *Pause proxy* /
+> *Resume proxy* in the row menu flips a `proxy_paused` flag; the proxy config
+> itself is kept, so resuming is one click, and a paused profile shows a
+> `paused` badge in the proxy column.
+>
+> Making that work *live* needed a loopback relay
+> ([`core/local_proxy.py`](src/camoufox_pm/core/local_proxy.py)). Playwright
+> configures Firefox's proxy below the WebExtension layer, so nothing inside the
+> browser can override it — both `browser.proxy.settings` and
+> `browser.proxy.onRequest` were tried against a live page and neither changed
+> where the traffic went. Camoufox is pointed at a loopback proxy instead, with
+> no credentials on it, and that relay decides per connection whether to forward
+> to the real upstream (adding its `Proxy-Authorization`) or to connect
+> directly. Flipping it drops the open tunnels, so the next request takes the
+> new route with no restart. A bundled WebExtension puts a button in the toolbar
+> that calls the same endpoint. HTTP and HTTPS upstreams only; a SOCKS proxy is
+> still handed straight to Playwright, where live toggling is unavailable.
+>
+> Measured against `api.ipify.org` in one running browser: upstream
+> `67.165.108.5` → paused `187.188.224.123` (the machine's own address) →
+> resumed `73.195.243.46`.
+>
+> Keeping the credentials out of Playwright is a side effect worth naming: the
+> browser is handed a loopback address, and the upstream's username and password
+> stay in the manager process.
+>
+> Windows extras: `launch.vbs` starts the desktop window with no console,
+> `launch.bat` does the same with one for debugging, and `make_icon.ps1`
+> generates the shortcut icon.
+
 [![CI](https://github.com/polyackiy/camoufox-profile-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/polyackiy/camoufox-profile-manager/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)

@@ -142,6 +142,13 @@ class ProfileResponse(BaseModel):
     status: ProfileStatus
     browser_settings: dict[str, Any]
     proxy_config: dict[str, Any] | None
+    proxy_paused: bool = Field(
+        False,
+        description=(
+            "When true the launcher starts the browser without the proxy, "
+            "even if proxy_config is set. Toggled from POST /profiles/{id}/proxy/toggle."
+        ),
+    )
     storage_path: str | None
     notes: str | None
     created_at: datetime
@@ -188,6 +195,7 @@ class ProfileResponse(BaseModel):
                 profile.browser_settings.model_dump() if profile.browser_settings else {}
             ),
             proxy_config=profile.proxy.model_dump() if profile.proxy else None,
+            proxy_paused=profile.proxy_paused,
             storage_path=profile.storage_path,
             notes=profile.notes,
             created_at=profile.created_at,

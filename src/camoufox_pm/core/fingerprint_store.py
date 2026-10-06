@@ -179,7 +179,18 @@ def resolve(launch_options: dict[str, Any], preset: dict[str, Any] | None = None
 
     try:
         resolved = camoufox_launch_options(**constraints)
-        config = json.loads(resolved["env"]["CAMOU_CONFIG_1"])
+        # Camoufox on Windows chunks CAMOU_CONFIG across env vars (2047 bytes
+        # each: CAMOU_CONFIG_1, CAMOU_CONFIG_2, ...). Reassemble in numeric order
+        # before parsing, otherwise any real-device preset — which never fits in
+        # 2047 bytes — fails with "Unterminated string".
+        env = resolved["env"]
+        chunks = sorted(
+            (int(k.rsplit("_", 1)[1]), v)
+            for k, v in env.items()
+            if k.startswith("CAMOU_CONFIG_")
+        )
+        raw = "".join(v for _, v in chunks)
+        config = json.loads(raw)
     except Exception as exc:  # noqa: BLE001 - never block a launch over this
         logger.warning(f"Could not resolve a fingerprint to pin: {exc}")
         return {}

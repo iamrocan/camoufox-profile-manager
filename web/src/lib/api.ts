@@ -74,6 +74,8 @@ export interface Profile {
   status: string
   browser_settings: BrowserSettings
   proxy_config?: ProxyConfig | null
+  /** When true the launcher ignores proxy_config and starts the browser direct. */
+  proxy_paused?: boolean
   storage_path?: string | null
   notes?: string | null
   created_at: string
@@ -252,6 +254,14 @@ export const profilesAPI = {
 
   deleteProfile(id: string): Promise<void> {
     return request<void>(`${API_PREFIX}/profiles/${id}`, { method: 'DELETE' })
+  },
+
+  clearData(id: string): Promise<{ profile_id: string; profile_name: string; bytes_removed: number; files_removed: number }> {
+    return request(`${API_PREFIX}/profiles/${id}/clear-data`, { method: 'POST' })
+  },
+
+  toggleProxyPaused(id: string): Promise<Profile> {
+    return request<Profile>(`${API_PREFIX}/profiles/${id}/proxy/toggle`, { method: 'POST' })
   },
 
   cloneProfile(id: string, newName: string): Promise<Profile> {

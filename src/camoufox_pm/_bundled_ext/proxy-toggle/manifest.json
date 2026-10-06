@@ -1,0 +1,26 @@
+{
+  "manifest_version": 2,
+  "name": "Camoufox Proxy Toggle",
+  "version": "2.0.0",
+  "description": "Pause or resume this profile's upstream proxy without restarting the browser.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "proxy-toggle@camoufox-pm",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "browser_action": {
+    "default_title": "Proxy: active (click to pause)",
+    "default_icon": {
+      "48": "icon.png"
+    }
+  }
+}

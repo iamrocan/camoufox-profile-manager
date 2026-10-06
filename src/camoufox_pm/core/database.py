@@ -102,6 +102,9 @@ class DatabaseManager:
                 # the first version-checked save of an upgraded database has a
                 # version to match against.
                 ("row_version", "BIGINT NOT NULL DEFAULT 0"),
+                # Pause-proxy flag. When 1, the launcher ignores proxy_config
+                # and starts the browser direct. Existing rows default to 0.
+                ("proxy_paused", "INTEGER NOT NULL DEFAULT 0"),
             ],
         }
         for table, columns in added_columns.items():
@@ -258,6 +261,7 @@ class DatabaseManager:
             profile.last_used.isoformat() if profile.last_used else None,
             json.dumps(profile.fingerprint) if profile.fingerprint else None,
             profile.proxy_check.model_dump_json() if profile.proxy_check else None,
+            1 if profile.proxy_paused else 0,
         )
 
     def _upsert_profile(self, profile: Profile) -> None:
@@ -274,8 +278,8 @@ class DatabaseManager:
             INSERT INTO profiles (
                 id, name, group_id, status, browser_settings, proxy_config,
                 extensions, storage_path, notes, created_at, updated_at, last_used,
-                fingerprint, proxy_check
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                fingerprint, proxy_check, proxy_paused
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 group_id = excluded.group_id,
@@ -289,7 +293,8 @@ class DatabaseManager:
                 updated_at = excluded.updated_at,
                 last_used = excluded.last_used,
                 fingerprint = excluded.fingerprint,
-                proxy_check = excluded.proxy_check
+                proxy_check = excluded.proxy_check,
+                proxy_paused = excluded.proxy_paused
         """,
             self._profile_columns(profile),
         )
@@ -327,7 +332,7 @@ class DatabaseManager:
                 name = ?, group_id = ?, status = ?, browser_settings = ?,
                 proxy_config = ?, extensions = ?, storage_path = ?, notes = ?,
                 created_at = ?, updated_at = ?, last_used = ?, fingerprint = ?,
-                proxy_check = ?, row_version = row_version + 1
+                proxy_check = ?, proxy_paused = ?, row_version = row_version + 1
             WHERE id = ? AND row_version = ?
             """,
             (*self._profile_columns(profile)[1:], profile.id, expected_row_version),
@@ -935,6 +940,9 @@ class DatabaseManager:
                 # one unreadable value. Losing the dot is the right cost.
                 logger.warning(f"Profile {row['id']}: unreadable proxy check, ignoring ({error})")
 
+        # Absent on rows written before the column existed; falls back to False.
+        proxy_paused = bool(row["proxy_paused"]) if "proxy_paused" in keys and row["proxy_paused"] is not None else False
+
         return Profile(
             id=row["id"],
             name=row["name"],
@@ -942,6 +950,7 @@ class DatabaseManager:
             status=ProfileStatus(row["status"]),
             browser_settings=browser_settings,
             proxy=proxy,
+            proxy_paused=proxy_paused,
             extensions=extensions,
             storage_path=row["storage_path"],
             notes=row["notes"],

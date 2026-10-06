@@ -9,8 +9,10 @@ import {
   Copy,
   Download,
   Ellipsis,
+  Eraser,
   Globe,
   PackageOpen,
+  Pause,
   Pencil,
   Play,
   Plus,
@@ -407,6 +409,44 @@ export default function ProfilesPage() {
           return next
         })
         loadProfiles()
+      },
+    })
+  }
+
+  async function toggleProxyPaused(profile: Profile) {
+    try {
+      const updated = await profilesAPI.toggleProxyPaused(profile.id)
+      toast(
+        'ok',
+        updated.proxy_paused ? 'Proxy paused' : 'Proxy resumed',
+        updated.proxy_paused
+          ? `${profile.name} will launch without its proxy until you resume it.`
+          : `${profile.name} will launch with its proxy again.`,
+      )
+      loadProfiles()
+    } catch (err) {
+      toast('error', 'Could not toggle proxy', String(err))
+    }
+  }
+
+  function askClearData(profile: Profile) {
+    setConfirm({
+      title: 'Clear browser data',
+      body: `Cookies, cache, history, local/session storage and downloads for "${profile.name}" will be wiped. The fingerprint, proxy and settings are kept — the profile keeps its identity but opens like a fresh install. This cannot be undone.`,
+      label: 'Clear data',
+      run: async () => {
+        try {
+          const result = await profilesAPI.clearData(profile.id)
+          const mb = (result.bytes_removed / 1_048_576).toFixed(1)
+          toast(
+            'ok',
+            `Cleared ${profile.name}`,
+            `${result.files_removed} files removed (${mb} MB). The fingerprint was kept.`,
+          )
+          loadProfiles()
+        } catch (err) {
+          toast('error', 'Could not clear data', String(err))
+        }
       },
     })
   }
@@ -851,11 +891,29 @@ export default function ProfilesPage() {
                                 closeMenu(profile.id)
                               }}
                             />
+                            {profile.proxy_config ? (
+                              <MenuItem
+                                icon={profile.proxy_paused ? <Play size={13} /> : <Pause size={13} />}
+                                label={profile.proxy_paused ? 'Resume proxy' : 'Pause proxy'}
+                                onClick={() => {
+                                  toggleProxyPaused(profile)
+                                  closeMenu(profile.id)
+                                }}
+                              />
+                            ) : null}
                             <MenuItem
                               icon={<PackageOpen size={13} />}
                               label="Export…"
                               onClick={() => {
                                 exportArchive(profile)
+                                closeMenu(profile.id)
+                              }}
+                            />
+                            <MenuItem
+                              icon={<Eraser size={13} />}
+                              label="Clear data"
+                              onClick={() => {
+                                askClearData(profile)
                                 closeMenu(profile.id)
                               }}
                             />
@@ -963,13 +1021,26 @@ export default function ProfilesPage() {
 function ProxyCell({ profile, checking }: { profile: Profile; checking: boolean }) {
   const configured = formatProxyString(profile.proxy_config) || '—'
   const check = profile.proxy_check
+  const paused = Boolean(profile.proxy_config && profile.proxy_paused)
 
   return (
     // Bounded, because a table cell grows to fit its content: an unreachable
     // proxy reports a whole sentence, and without a cap one dead proxy pushed
     // the row actions off the screen and gave the table a scrollbar.
     <div className="max-w-[280px] leading-tight">
-      <div className="truncate font-mono text-ink-faint">{configured}</div>
+      <div className="flex items-center gap-1.5">
+        <span className={`truncate font-mono ${paused ? 'text-ink-faint/50 line-through' : 'text-ink-faint'}`}>
+          {configured}
+        </span>
+        {paused ? (
+          <span
+            className="shrink-0 rounded-full border border-warn/40 bg-warn/10 px-1.5 py-[1px] text-[10px] font-medium uppercase tracking-wide text-warn"
+            title="Proxy paused: next launch will not use it. Toggle from the row menu."
+          >
+            paused
+          </span>
+        ) : null}
+      </div>
       {checking ? (
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-faint">
           <span className="signal-pulse h-1.5 w-1.5 rounded-full bg-signal" />

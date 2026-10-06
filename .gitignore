@@ -247,6 +247,9 @@ data/
 demo_data/
 **/profile_*/
 
+# Prebuilt wheels dropped in the repo root for a local install
+/*.whl
+
 # Temporary browser launch scripts
 launch_*.py
 
