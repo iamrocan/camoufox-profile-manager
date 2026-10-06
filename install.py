@@ -97,6 +97,12 @@ def die(message: str, *, hint: str = "") -> None:
     raise SystemExit(1)
 
 
+def run_ok(cmd: list[str], *, cwd: Path | None = None) -> bool:
+    """Run a command, show its output, and report whether it worked."""
+    info(f"$ {subprocess.list2cmdline(cmd)}")
+    return subprocess.run(cmd, cwd=str(cwd) if cwd else None).returncode == 0
+
+
 def run(cmd: list[str], *, cwd: Path | None = None, what: str = "") -> None:
     """Run a command, showing its output, and stop the install if it fails.
 
@@ -287,9 +293,35 @@ def _uv_works(cmd: list[str]) -> bool:
 def sync_dependencies(uv: list[str], target: Path) -> None:
     step("Instalando dependencias con las versiones exactas de uv.lock")
     info("Esto puede tardar varios minutos la primera vez.")
+
     # --extra desktop brings pywebview, which is what gives the app its own
     # window instead of opening a browser tab.
-    run(uv + ["sync", "--extra", "desktop"], cwd=target, what="uv sync")
+    base = uv + ["sync", "--extra", "desktop"]
+
+    # uv hardlinks from its cache so the same wheel is not stored twice. A
+    # cloud-sync filter driver cannot represent a hardlink, and refuses with
+    # ERROR_CLOUD_FILE_INCOMPATIBLE_HARDLINKS -- so copy instead when we can
+    # already see we are inside one.
+    if cloud_root(target):
+        info("Carpeta sincronizada en la nube: copiando en vez de enlazar.")
+        base += ["--link-mode=copy"]
+
+    if run_ok(base, cwd=target):
+        return
+
+    # The filesystem may be unable to hardlink for reasons we cannot see from
+    # the path alone -- a mapped drive, or a sync client we do not know about.
+    # One retry that cannot hit the problem beats asking the user to diagnose it.
+    if "--link-mode=copy" not in base:
+        warn("Falló la instalación; reintentando sin enlaces permanentes.")
+        if run_ok(base + ["--link-mode=copy"], cwd=target):
+            return
+
+    die(
+        "uv sync no pudo instalar las dependencias",
+        hint="Revisa el error de arriba. Si fue de red, reintenta: volver a "
+        "ejecutar install.py continúa donde quedó.",
+    )
 
 
 # --- the browser -------------------------------------------------------------
@@ -456,17 +488,87 @@ def report(target: Path, shortcut: Path | None, git_managed: bool) -> None:
 # --- main --------------------------------------------------------------------
 
 
+CLOUD_ENV_VARS = ("OneDrive", "OneDriveCommercial", "OneDriveConsumer")
+CLOUD_DIR_NAMES = ("onedrive", "dropbox", "google drive", "googledrive", "icloud drive")
+
+
+def cloud_root(path: Path) -> Path | None:
+    """The cloud-sync folder `path` is inside, if it is inside one.
+
+    Checked by the sync clients' own environment variables first, since those
+    are authoritative, then by folder name for the clients that do not set one.
+    """
+    for var in CLOUD_ENV_VARS:
+        value = os.environ.get(var)
+        if not value:
+            continue
+        try:
+            root = Path(value).resolve()
+            if path == root or path.is_relative_to(root):
+                return root
+        except (OSError, ValueError):
+            continue
+
+    for parent in (path, *path.parents):
+        if parent.name.lower() in CLOUD_DIR_NAMES:
+            return parent
+    return None
+
+
+def refuse_cloud_folder(target: Path, root: Path, allowed: bool) -> None:
+    """Installing into a synced folder corrupts data rather than failing.
+
+    Worth stopping over, because nothing here goes wrong at install time. The
+    profile database runs in SQLite's WAL mode, which means three files that are
+    only consistent with each other; a sync client uploads them whenever it
+    likes, and restoring that set from different moments is how a WAL database
+    is corrupted. On top of that every browser profile is thousands of small
+    files rewritten constantly, and the proxy passwords are plain text wherever
+    CPM_SECRET_KEY is unset -- so this would upload them to someone's cloud.
+    """
+    warn(f"{target} está dentro de una carpeta sincronizada en la nube ({root}).")
+    warn("No es un buen lugar para esta aplicación:")
+    warn("  - La base de perfiles es SQLite en modo WAL: son tres archivos que")
+    warn("    solo son válidos juntos, y el cliente de sincronización los sube")
+    warn("    cuando le toca. Así se corrompe una base WAL.")
+    warn("  - Cada perfil son miles de archivos pequeños que cambian sin parar.")
+    warn("  - Las contraseñas de proxy están en texto plano si CPM_SECRET_KEY")
+    warn("    no está definida, y acabarían subidas a la nube.")
+
+    if allowed:
+        warn("Continuando porque se pasó --allow-cloud-folder.")
+        return
+
+    warn("")
+    warn("Instala en una ruta local, por ejemplo:")
+    warn('  python install.py --dir "C:/Camoufox Persistente"')
+    warn("El acceso directo se crea igual en el escritorio.")
+    warn("Si de verdad lo quieres ahí, añade --allow-cloud-folder.")
+    warn("")
+
+    die(
+        "instalación cancelada para no poner los datos en la nube",
+        hint="instala en una ruta local; mira las sugerencias de arriba",
+    )
+
+
 def default_target() -> Path:
     if IS_WINDOWS:
-        # USERPROFILE\Desktop is right for the overwhelming majority; a
-        # OneDrive-redirected Desktop is handled by falling back to it.
         home = Path(os.environ.get("USERPROFILE", Path.home()))
         desktop = home / "Desktop"
         if not desktop.is_dir():
             onedrive = Path(os.environ.get("OneDrive", "")) / "Desktop"
             if onedrive.is_dir():
                 desktop = onedrive
-        return desktop / "Camoufox Persistente"
+
+        # A Desktop that OneDrive has taken over is the common case on a new
+        # Windows, and the one place this must not install itself. Fall back to
+        # the home folder, which no sync client claims; the shortcut still goes
+        # on the Desktop, and a shortcut is a kilobyte.
+        candidate = desktop / "Camoufox Persistente"
+        if cloud_root(candidate.resolve() if desktop.is_dir() else candidate):
+            return home / "Camoufox Persistente"
+        return candidate
     return Path.home() / "camoufox-persistente"
 
 
@@ -486,6 +588,11 @@ def main() -> None:
         "--no-shortcut", action="store_true",
         help="No crear el acceso directo en el escritorio",
     )
+    parser.add_argument(
+        "--allow-cloud-folder", action="store_true",
+        help="Permitir instalar dentro de OneDrive u otra carpeta sincronizada "
+             "(no recomendado: corrompe la base de perfiles)",
+    )
     args = parser.parse_args()
 
     setup_console()
@@ -497,6 +604,14 @@ def main() -> None:
     print(f"\nSe instalará en: {target}")
 
     check_python()
+
+    # Before anything is downloaded: this is about where the data will live, and
+    # the answer does not improve after spending ten minutes installing.
+    root = cloud_root(target)
+    if root:
+        step("Comprobando la ubicación elegida")
+        refuse_cloud_folder(target, root, args.allow_cloud_folder)
+
     git_managed = fetch_code(target)
     uv = ensure_uv()
     sync_dependencies(uv, target)
