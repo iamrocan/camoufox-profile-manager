@@ -5,7 +5,7 @@ Reproduces a working desktop install: the code, the exact dependency versions
 from uv.lock, the browser itself, and a Desktop shortcut that opens the app in
 its own window with no console behind it.
 
-Deliberately stdlib only. The whole premise is a machine with nothing but
+Needs Python 3.10 to 3.13: uv.lock pins a numpy with no wheel for 3.14, and\nbuilding it from source is not something a machine with only Python can do.\n\nDeliberately stdlib only. The whole premise is a machine with nothing but
 Python on it, so an installer that needs its own dependencies installed first
 would not solve the problem it exists for.
 
@@ -41,6 +41,13 @@ REPO_URL = "https://github.com/iamrocan/camoufox-profile-manager.git"
 ZIP_URL = "https://github.com/iamrocan/camoufox-profile-manager/archive/refs/heads/main.zip"
 SHORTCUT_NAME = "Camoufox Profile Manager"
 MIN_PYTHON = (3, 10)
+# The newest Python uv.lock has wheels for. numpy, which camoufox and fpgen both
+# pull in, publishes no wheel for 3.14 at the locked 2.2.6, so uv falls back to
+# building it from source -- which fails on a machine with no C toolchain and
+# leaves the environment with nothing installed in it. Checked before anything
+# is downloaded, because otherwise the failure surfaces minutes later as a
+# compiler error that names neither Python nor numpy as the problem.
+MAX_PYTHON = (3, 13)
 
 IS_WINDOWS = os.name == "nt"
 
@@ -123,14 +130,35 @@ def run(cmd: list[str], *, cwd: Path | None = None, what: str = "") -> None:
 # --- preconditions -----------------------------------------------------------
 
 
-def check_python() -> None:
-    step(f"Comprobando Python (se necesita {MIN_PYTHON[0]}.{MIN_PYTHON[1]} o superior)")
+def check_python(allow_untested: bool = False) -> None:
+    want = f"{MIN_PYTHON[0]}.{MIN_PYTHON[1]}–{MAX_PYTHON[0]}.{MAX_PYTHON[1]}"
+    step(f"Comprobando Python (se necesita {want})")
     if sys.version_info < MIN_PYTHON:
         die(
             f"Python {sys.version.split()[0]} es demasiado antiguo",
             hint=f"Instala Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ desde python.org "
             "y vuelve a ejecutar este script con esa versión.",
         )
+
+    running = f"{sys.version_info.major}.{sys.version_info.minor}"
+    if sys.version_info[:2] > MAX_PYTHON:
+        newest = f"{MAX_PYTHON[0]}.{MAX_PYTHON[1]}"
+        if not allow_untested:
+            die(
+                f"Python {sys.version.split()[0]} es más nuevo de lo que este "
+                "proyecto tiene fijado",
+                hint=(
+                    f"uv.lock fija numpy, que no publica wheel para {running}. uv "
+                    "intentaría compilarlo, fallaría, y el entorno se quedaría "
+                    f"vacío.\n       Instala Python {newest} desde python.org y "
+                    "ejecuta este script con esa versión.\n       No uses `uv "
+                    "python install`: los Python que uv descarga no están firmados "
+                    "por la PSF, y Smart App Control los bloquea.\n       Para "
+                    "intentarlo igualmente: --allow-untested-python"
+                ),
+            )
+        warn(f"Python {running} no está probado con este uv.lock (--allow-untested-python).")
+        warn("Si `uv sync` falla compilando numpy, esta es la razón.")
     info(f"Python {sys.version.split()[0]} — correcto")
 
     if not IS_WINDOWS:
@@ -678,6 +706,11 @@ def main() -> None:
              "descargar nada (por defecto, para la carpeta donde está este archivo)",
     )
     parser.add_argument(
+        "--allow-untested-python", action="store_true",
+        help=f"Instalar con un Python m\u00e1s nuevo que {MAX_PYTHON[0]}.{MAX_PYTHON[1]} "
+             "(no recomendado: uv.lock no tiene wheels para \u00e9l)",
+    )
+    parser.add_argument(
         "--allow-cloud-folder", action="store_true",
         help="Permitir instalar dentro de OneDrive u otra carpeta sincronizada "
              "(no recomendado: corrompe la base de perfiles)",
@@ -697,7 +730,7 @@ def main() -> None:
     print("=" * 70)
     print(f"\nSe instalará en: {target}")
 
-    check_python()
+    check_python(args.allow_untested_python)
 
     # Before anything is downloaded: this is about where the data will live, and
     # the answer does not improve after spending ten minutes installing.

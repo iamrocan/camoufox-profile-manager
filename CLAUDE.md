@@ -19,6 +19,17 @@ uv sync --extra dev --extra desktop     # dev brings pytest, ruff, mypy
 .venv/Scripts/camoufox fetch            # the browser itself, ~200 MB
 ```
 
+**Python 3.10 to 3.13**, despite `requires-python = ">=3.10"`. `uv.lock` pins
+numpy 2.2.6, which camoufox and fpgen both pull in and which ships no wheel for
+3.14; uv then tries to build it from source, fails, and leaves the environment
+with nothing in it. The app comes up with `No module named 'uvicorn'`, which
+names neither Python nor numpy, so it is worth recognising. `install.py` checks
+this before downloading anything and `MAX_PYTHON` is where the cap lives --
+raise it when the lock moves to a numpy that has the wheels.
+
+Get that Python from python.org, not from `uv python install`: the interpreters
+uv downloads are not PSF-signed, and Smart App Control blocks them.
+
 Call the venv's executables directly, not through `uv run`, unless you name the
 extras — see the note under Tests for why.
 

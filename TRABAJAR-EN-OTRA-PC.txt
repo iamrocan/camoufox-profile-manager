@@ -28,7 +28,7 @@ la interfaz tiene nombres largos y anidados.
 1. QUE NECESITAS INSTALADO
 -------------------------------------------------------------------------------
 
-  Python 3.10 o superior      https://python.org        (obligatorio)
+  Python 3.10 a 3.13          https://python.org        (obligatorio)
   Git                         https://git-scm.com       (obligatorio)
   Node.js 24                  https://nodejs.org        (solo si tocas la interfaz)
   Claude Code                 https://claude.com/claude-code
@@ -39,6 +39,16 @@ Comprueba que esten:
   python --version
   git --version
   node --version
+
+OJO CON LA VERSION DE PYTHON. Tiene que ser 3.13 o anterior. Con 3.14 la
+instalacion falla: uv.lock fija una version de numpy que no publica wheel para
+3.14, asi que uv intenta compilarlo, no puede, y el entorno se queda VACIO --
+la app arranca con "No module named 'uvicorn'" o parecido. install.py ya lo
+comprueba y se para antes de descargar nada.
+
+Y no uses `uv python install` para conseguir una version buena: los Python que
+uv descarga no estan firmados por la PSF, y Smart App Control los bloquea.
+Bajalo de python.org.
 
 
 -------------------------------------------------------------------------------
