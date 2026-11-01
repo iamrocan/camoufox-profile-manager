@@ -51,8 +51,19 @@ foreach ($f in 'python.exe', 'pythonw.exe', 'camoufox-pm.exe') {
 "=== 6 PYTHON BASE DEL VENV ==="
 (Get-Content (Join-Path $Dir '.venv\pyvenv.cfg') | Out-String).Trim()
 
-"=== 7 IMPORTA EL PAQUETE Y PYWEBVIEW? ==="
-(& $py -c "import sys; print(sys.version); import camoufox_pm; print('camoufox_pm OK'); import webview; print('pywebview OK')" 2>&1 | Out-String).Trim()
+"=== 7 DEPENDENCIAS DEL VENV ==="
+$probe = @"
+import sys
+print(sys.version)
+for m in ('camoufox_pm','uvicorn','fastapi','sqlalchemy','playwright','camoufox','webview'):
+    try:
+        __import__(m)
+        print('%-14s OK' % m)
+    except Exception as e:
+        print('%-14s FALTA  (%s: %s)' % (m, type(e).__name__, e))
+"@
+(& $py -c $probe | Out-String).Trim()
+"(webview es pywebview, solo lo necesita --desktop; el resto es obligatorio)"
 
 "=== 8 RESPONDE EL CLI? ==="
 (& $py -m camoufox_pm.cli --help 2>&1 | Select-Object -First 2 | Out-String).Trim()
@@ -90,7 +101,15 @@ if ($c) { foreach ($x in $c) { "ocupado por PID " + $x.OwningProcess + " (" + (G
 "=== 12 BLOQUEOS CODEINTEGRITY (7 dias) ==="
 $e = Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-CodeIntegrity/Operational'; StartTime = (Get-Date).AddDays(-7) } |
     Where-Object { $_.Message -like '*camoufox*' -or $_.Message -like '*python*' }
-if ($e) { ($e | Select-Object -First 6 TimeCreated, Id | Format-Table -AutoSize | Out-String).Trim() } else { "ninguno relacionado" }
+if ($e) {
+    foreach ($x in ($e | Select-Object -First 8)) {
+        # The message names the loading process first and the file that was
+        # blocked second, so keep both: "cmd.exe <- camoufox-pm.exe" reads as
+        # what tried to load what.
+        $f = (([regex]::Matches($x.Message, '[^\s"(),]+\.(exe|dll|vbs|ps1)') | ForEach-Object { Split-Path $_.Value -Leaf } | Select-Object -Unique) -join ' <- ')
+        "{0}  id {1}  {2}" -f $x.TimeCreated, $x.Id, $(if ($f) { $f } else { ($x.Message -split "`n")[0].Trim() })
+    }
+} else { "ninguno relacionado" }
 
 "=== 13 ACCESO DIRECTO ==="
 $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Camoufox Profile Manager.lnk'

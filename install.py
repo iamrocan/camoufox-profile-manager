@@ -453,6 +453,23 @@ Write-Output $link
     return path
 
 
+def install_target(explicit: Path | None) -> Path:
+    """Where to operate, given --dir or nothing.
+
+    An install.py sitting next to a .venv is an install being re-run, so that
+    folder wins over the default location. Without this, following the update
+    instructions report() prints -- cd into the install, then
+    `python install.py --no-browser` -- would quietly build a second copy at
+    the default path for anyone who installed with --dir.
+    """
+    if explicit:
+        return explicit.expanduser().resolve()
+    here = Path(__file__).resolve().parent
+    if (here / ".venv").is_dir():
+        return here
+    return default_target().expanduser().resolve()
+
+
 def repair_shortcut(explicit: Path | None) -> None:
     """Rebuild the Desktop shortcut for an existing install, and nothing else.
 
@@ -464,11 +481,7 @@ def repair_shortcut(explicit: Path | None) -> None:
     if not IS_WINDOWS:
         raise SystemExit("--shortcut-only solo sirve en Windows.")
 
-    # Run from inside an install to repair it, so the folder holding this file
-    # is the sensible default rather than the installer's own default location.
-    here = Path(__file__).resolve().parent
-    base = explicit or (here if (here / ".venv").is_dir() else default_target())
-    target = base.expanduser().resolve()
+    target = install_target(explicit)
 
     print(f"\nRehaciendo el acceso directo para: {target}")
     if not (target / ".venv").is_dir():
@@ -677,7 +690,7 @@ def main() -> None:
         repair_shortcut(args.dir)
         return
 
-    target = (args.dir or default_target()).expanduser().resolve()
+    target = install_target(args.dir)
 
     print("=" * 70)
     print("  Camoufox Profile Manager — instalador")
