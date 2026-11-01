@@ -120,4 +120,17 @@ if (Test-Path $lnk) {
     "workdir: " + $sc.WorkingDirectory
 } else { "NO EXISTE  <-- creado por: python install.py --shortcut-only" }
 
+# The browser is a separate ~200 MB download, and install.py fetches it after
+# the dependencies -- so a sync that failed leaves the manager starting fine and
+# every profile launch failing, which is not obviously the same problem.
+"=== 14 NAVEGADOR CAMOUFOX (hace falta para lanzar perfiles) ==="
+$bv = (& $py -m camoufox version 2>&1 | Out-String)
+if ($bv -match 'No module named') {
+    "no se puede comprobar: falta el paquete camoufox (ver seccion 7)"
+} else {
+    $inst = ([regex]::Match($bv, 'Installed\s+(\S+)')).Groups[1].Value
+    $cur = ([regex]::Match($bv, 'Current browser\s+(\S+)')).Groups[1].Value
+    if ($inst -eq 'Yes') { "instalado, " + $cur } else { "NO DESCARGADO  <-- descargalo con: .venv\Scripts\python.exe -m camoufox fetch" }
+}
+
 "=== FIN ==="
