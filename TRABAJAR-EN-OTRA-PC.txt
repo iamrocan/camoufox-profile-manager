@@ -89,16 +89,25 @@ en la nube no sabe representarlos. Anade --link-mode=copy:
 
   uv sync --extra dev --extra desktop --link-mode=copy
 
-Y OJO: ese error significa que ALGO esta sincronizando esa carpeta. Eso es
-peligroso por si mismo -- lee el punto 0 -- y install.py no lo detecto, porque
-mira las variables de entorno y los nombres de carpeta de los clientes de
-sincronizacion, no el sistema de archivos. Comprueba si de verdad lo esta:
+El error lo levanta el filtro de nube de Windows, pero NO significa
+necesariamente que tu carpeta este sincronizada: ya se vio en una maquina donde
+no lo estaba, y la opcion lo arreglo igual.
+
+Aun asi vale la pena comprobarlo, porque si SI lo esta tienes el problema del
+punto 0 (la base de perfiles se corrompe) e install.py puede no haberlo
+detectado -- mira variables de entorno y nombres de carpeta, no el sistema de
+archivos:
 
   (Get-Item "C:\Camoufox Persistente").Attributes
   $env:OneDrive
 
 Si los atributos incluyen ReparsePoint, Offline o RecallOnDataAccess, esa
-carpeta esta sincronizada y la base de perfiles corre peligro. Muevela.
+carpeta esta sincronizada y hay que moverla. Si salen como "Directory" a secas,
+la carpeta esta bien y basta con --link-mode=copy.
+
+Para no volver a escribir la opcion cada vez:
+
+  [Environment]::SetEnvironmentVariable('UV_LINK_MODE','copy','User')
 
 
 -------------------------------------------------------------------------------

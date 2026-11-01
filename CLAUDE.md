@@ -64,12 +64,25 @@ represent a hardlink. Add `--link-mode=copy`:
 uv sync --extra dev --extra desktop --link-mode=copy
 ```
 
-`install.py` detects this case and retries on its own, so it only bites a manual
-sync. What it also tells you is that **something is syncing that folder**, which
-is its own problem -- see the WAL warning above -- and `cloud_root()` will not
-have caught it, since that checks the sync clients' environment variables and
-folder names rather than asking the filesystem. A folder can sit under a cloud
-filter driver with neither giveaway.
+`install.py` detects a synced target, passes the flag, and retries with it when
+the first attempt fails anyway, so this only bites a manual sync.
+
+The error comes from Windows' cloud filter driver, but **do not read it as proof
+that the folder is synced.** Seen on a machine where it was not: the install
+folder and uv's cache both had plain `Directory` attributes, with no
+`ReparsePoint`, `Offline` or `RecallOnDataAccess` between them, and `%OneDrive%`
+pointed somewhere else entirely. The flag fixed it regardless.
+
+Worth checking anyway, because if a folder *is* synced that is the
+WAL-corruption case above and `cloud_root()` can miss it -- it reads the sync
+clients' environment variables and folder names rather than asking the
+filesystem:
+
+```bash
+powershell -Command "(Get-Item .).Attributes; $env:OneDrive"
+```
+
+A clean answer there means the folder is fine, not that the error was spurious.
 
 ## The committed UI bundle
 
