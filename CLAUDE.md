@@ -68,6 +68,41 @@ named the wrong problem entirely.
 Changing anything under `src/camoufox_pm/` means closing and reopening the
 manager. Changing only `web/src` plus a rebuild does not.
 
+## Smart App Control blocks the console scripts
+
+On Windows 11 with Smart App Control on, `camoufox-pm.exe` and `camoufox.exe`
+are blocked: "part of this app has been blocked", or in a console *"Una
+directiva de Control de aplicaciones bloqueo este archivo"*, with CodeIntegrity
+3033/3077/3118 in the event log. Neither pip nor uv ships those files; they
+build them on the machine from a stub, so they are unsigned binaries with no
+reputation, which is exactly what SAC vetoes. `python.exe` and `pythonw.exe` in
+the same venv are signed by the Python Software Foundation and are allowed.
+
+So nothing here invokes the stubs. `launch.vbs`, `launch.bat` and the shortcut
+`install.py` creates all go through the venv's interpreter with
+`-m camoufox_pm.cli`, which loads the same code. The shortcut points at
+`pythonw.exe` **directly** rather than at `launch.vbs`, because SAC's script
+enforcement also reaches Windows Script Host.
+
+Two things follow. SAC's verdict comes from cloud reputation, not from the file,
+so it can allow a binary one day and block it the next with nothing changed on
+disk -- a launch that worked yesterday and fails today is this, not a
+regression. And the shortcut lives on the Desktop, not in the repository, so a
+`git pull` fixes the launchers but cannot fix a `.lnk` an older `install.py`
+already wrote:
+
+```bash
+python install.py --shortcut-only   # repoints the shortcut, installs nothing
+```
+
+Do not suggest turning SAC off: it cannot be turned back on without
+reinstalling Windows, and the signed route costs nothing.
+
+Check the state with
+`(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy').VerifiedAndReputablePolicyState`
+-- 0 off, 1 blocking, 2 evaluating -- and the signatures with
+`Get-AuthenticodeSignature`.
+
 ## Translations
 
 `web/src/lib/i18n.tsx` holds both languages. `en` is the source of truth and
@@ -108,7 +143,7 @@ corrupted `web/src/app/page.tsx` once. Use an editor, or Python with an explicit
 
 **`uv run` re-resolves the environment on every invocation.** That costs seconds
 of startup and fails outright with no network, which is why `launch.vbs` and
-`launch.bat` call `.venv/Scripts/camoufox-pm.exe` directly instead.
+`launch.bat` call the venv's interpreter directly instead.
 
 ## Where the interesting parts are
 

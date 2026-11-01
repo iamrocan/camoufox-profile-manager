@@ -116,7 +116,7 @@ regresion). Si falla solo ese, estas bien.
 
 Arranca la app:
 
-  .venv\Scripts\camoufox-pm.exe --desktop
+  .venv\Scripts\python.exe -m camoufox_pm.cli --desktop
 
 O doble clic en launch.vbs. Si algo falla, usa launch.bat: abre consola y
 muestra el error.
@@ -143,7 +143,7 @@ con esta linea:
 
 
 -------------------------------------------------------------------------------
-7. LAS TRES TRAMPAS QUE CUESTAN TIEMPO
+7. LAS CUATRO TRAMPAS QUE CUESTAN TIEMPO
 -------------------------------------------------------------------------------
 
 (a) SI CAMBIAS LA INTERFAZ, HAY QUE RECOMPILAR
@@ -180,6 +180,35 @@ con esta linea:
     con encoding="utf-8" explicito.
 
     Para detectar el dano:   grep -c "â€" archivo.tsx
+
+
+(d) SI WINDOWS DICE "part of this app has been blocked"
+
+    Es Smart App Control de Windows 11, no la app. camoufox-pm.exe y
+    camoufox.exe no los distribuye nadie: pip y uv los FABRICAN en tu maquina a
+    partir de un stub, asi que son binarios sin firmar y sin reputacion, que es
+    justo lo que SAC veta (eventos CodeIntegrity 3033/3077/3118). El python.exe
+    y el pythonw.exe del mismo venv SI estan firmados por la Python Software
+    Foundation y SAC los permite.
+
+    Por eso nada de este repositorio llama a esos .exe. Si tu acceso directo
+    viene de una version antigua de install.py, repuntalo:
+
+      python install.py --shortcut-only
+
+    Y desde consola, en vez del nombre corto:
+
+      .venv\Scripts\python.exe -m camoufox_pm.cli --desktop
+
+    Comprobar si SAC esta encendido (0 apagado, 1 bloqueando, 2 evaluando):
+
+      (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy').VerifiedAndReputablePolicyState
+
+    NO lo apagues para salir del paso: una vez apagado no se puede reencender
+    sin reinstalar Windows, y la via firmada no te cuesta nada.
+
+    Ojo: SAC decide por reputacion en la nube, no por el archivo. Puede permitir
+    algo un dia y bloquearlo al siguiente sin que tu cambies nada.
 
 
 -------------------------------------------------------------------------------

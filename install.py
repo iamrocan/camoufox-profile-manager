@@ -20,6 +20,7 @@ Usage, from a folder containing this file:
     python install.py --dir D:\\Camoufox     # somewhere else
     python install.py --no-browser         # skip the ~200 MB browser download
     python install.py --no-shortcut        # no Desktop shortcut
+    python install.py --shortcut-only      # only redo the shortcut, install nothing
 
 Re-running it is safe: an existing install is updated in place, not replaced.
 """
@@ -396,10 +397,22 @@ def venv_bin(target: Path, name: str) -> Path:
 def create_shortcut(target: Path) -> Path | None:
     step("Creando el acceso directo en el escritorio")
 
-    launcher = target / "launch.vbs"
+    # Points at the venv's pythonw.exe, not at camoufox-pm.exe and not at
+    # launch.vbs. Windows 11's Smart App Control blocks both. pip and uv do not
+    # ship the console scripts; they build them on the machine from a stub, so
+    # camoufox-pm.exe is an unsigned binary with no reputation -- exactly the
+    # profile SAC vetoes, with "part of this app has been blocked" and
+    # CodeIntegrity 3033/3077/3118 in the log -- and SAC's verdict can flip on
+    # its own, since it is refreshed from cloud reputation rather than from the
+    # file. SAC's script enforcement also reaches Windows Script Host, which is
+    # what would run the .vbs, so routing through it is no safer. pythonw.exe is
+    # signed by the Python Software Foundation and -m loads the same code with
+    # no console window. WorkingDirectory is what puts the database at
+    # data/profiles.db inside the install, that default being a relative path.
+    pythonw = venv_bin(target, "pythonw")
     icon = target / "camoufox.ico"
-    if not launcher.is_file():
-        warn(f"no se encontró {launcher}; se omite el acceso directo.")
+    if not pythonw.is_file():
+        warn(f"no se encontró {pythonw}; se omite el acceso directo.")
         return None
 
     # Built by PowerShell because the shortcut format is a COM object, and the
@@ -409,7 +422,8 @@ $desktop = [Environment]::GetFolderPath('Desktop')
 $link = Join-Path $desktop '{SHORTCUT_NAME}.lnk'
 $shell = New-Object -ComObject WScript.Shell
 $sc = $shell.CreateShortcut($link)
-$sc.TargetPath = '{launcher}'
+$sc.TargetPath = '{pythonw}'
+$sc.Arguments = '-m camoufox_pm.cli --desktop'
 $sc.WorkingDirectory = '{target}'
 $sc.Description = 'Camoufox Profile Manager'
 {f"$sc.IconLocation = '{icon}'" if icon.is_file() else ""}
@@ -430,13 +444,41 @@ Write-Output $link
 
     if result.returncode != 0:
         warn(f"no se pudo crear el acceso directo: {(result.stderr or '').strip()[:300]}")
-        warn(f"Puedes abrir la app igualmente con {launcher}")
+        warn(f"Puedes abrir la app igualmente con {target / 'launch.bat'}")
         return None
 
     link = (result.stdout or "").strip().splitlines()
     path = Path(link[-1]) if link else None
     info(f"Acceso directo: {path}")
     return path
+
+
+def repair_shortcut(explicit: Path | None) -> None:
+    """Rebuild the Desktop shortcut for an existing install, and nothing else.
+
+    Exists because the shortcut lives on the Desktop, not in the repository, so
+    a `git pull` that fixes the launchers cannot fix a shortcut created by an
+    older version of this script -- and that is the one case where the whole
+    install is fine and only the .lnk points at the wrong file.
+    """
+    if not IS_WINDOWS:
+        raise SystemExit("--shortcut-only solo sirve en Windows.")
+
+    # Run from inside an install to repair it, so the folder holding this file
+    # is the sensible default rather than the installer's own default location.
+    here = Path(__file__).resolve().parent
+    base = explicit or (here if (here / ".venv").is_dir() else default_target())
+    target = base.expanduser().resolve()
+
+    print(f"\nRehaciendo el acceso directo para: {target}")
+    if not (target / ".venv").is_dir():
+        warn(f"{target} no parece una instalación: no tiene .venv.")
+        warn("Pasa la carpeta correcta con --dir, o ejecuta install.py sin --shortcut-only.")
+        raise SystemExit(1)
+
+    if create_shortcut(target) is None:
+        raise SystemExit(1)
+    print("\nListo. Doble clic en el acceso directo del escritorio.\n")
 
 
 # --- summary -----------------------------------------------------------------
@@ -618,6 +660,11 @@ def main() -> None:
         help="No crear el acceso directo en el escritorio",
     )
     parser.add_argument(
+        "--shortcut-only", action="store_true",
+        help="Solo rehacer el acceso directo del escritorio, sin instalar ni "
+             "descargar nada (por defecto, para la carpeta donde está este archivo)",
+    )
+    parser.add_argument(
         "--allow-cloud-folder", action="store_true",
         help="Permitir instalar dentro de OneDrive u otra carpeta sincronizada "
              "(no recomendado: corrompe la base de perfiles)",
@@ -625,6 +672,11 @@ def main() -> None:
     args = parser.parse_args()
 
     setup_console()
+
+    if args.shortcut_only:
+        repair_shortcut(args.dir)
+        return
+
     target = (args.dir or default_target()).expanduser().resolve()
 
     print("=" * 70)
