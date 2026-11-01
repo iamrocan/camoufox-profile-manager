@@ -121,6 +121,13 @@ Arranca la app:
 O doble clic en launch.vbs. Si algo falla, usa launch.bat: abre consola y
 muestra el error.
 
+Y si no arranca y no sabes por que, no adivines: hay un diagnostico que lo
+dice todo de una vez (carpeta, firmas, Smart App Control, WebView2, si el
+servidor levanta, si el puerto esta ocupado, a donde apunta el acceso
+directo). No cambia nada en la maquina:
+
+  powershell -ExecutionPolicy Bypass -File scripts\diagnose.ps1
+
 
 -------------------------------------------------------------------------------
 6. TRABAJAR CON CLAUDE CODE

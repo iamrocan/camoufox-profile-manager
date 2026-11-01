@@ -98,6 +98,18 @@ python install.py --shortcut-only   # repoints the shortcut, installs nothing
 Do not suggest turning SAC off: it cannot be turned back on without
 reinstalling Windows, and the signed route costs nothing.
 
+For a launch that fails for *any* reason, run the diagnostic rather than
+guessing, because several unrelated causes look identical from outside:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/diagnose.ps1
+```
+
+Its section 10 is the one that pays: it starts the server on a spare port, which
+separates a server that will not boot from a window that will not open. The
+commonest cause of the second is a missing WebView2 runtime, which pywebview
+renders in -- the server then works perfectly and only `--desktop` fails.
+
 Check the state with
 `(Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy').VerifiedAndReputablePolicyState`
 -- 0 off, 1 blocking, 2 evaluating -- and the signatures with
