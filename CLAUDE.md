@@ -49,6 +49,28 @@ profile database is SQLite in WAL mode — three files that are only consistent
 with each other — and a sync client uploads them whenever it likes. `install.py`
 refuses such a folder and explains why.
 
+### `uv sync` failing with os error 396
+
+```
+failed to hardlink file ... La operación de nube no se puede realizar en un
+archivo con vínculos permanentes incompatibles. (os error 396)
+```
+
+That is `ERROR_CLOUD_FILE_INCOMPATIBLE_HARDLINKS`. uv hardlinks from its cache
+so one wheel is not stored twice, and a cloud-sync filter driver cannot
+represent a hardlink. Add `--link-mode=copy`:
+
+```bash
+uv sync --extra dev --extra desktop --link-mode=copy
+```
+
+`install.py` detects this case and retries on its own, so it only bites a manual
+sync. What it also tells you is that **something is syncing that folder**, which
+is its own problem -- see the WAL warning above -- and `cloud_root()` will not
+have caught it, since that checks the sync clients' environment variables and
+folder names rather than asking the filesystem. A folder can sit under a cloud
+filter driver with neither giveaway.
+
 ## The committed UI bundle
 
 `src/camoufox_pm/webui/` is **build output that is committed on purpose**, which

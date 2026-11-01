@@ -80,6 +80,27 @@ OJO: si algun dia corres install.py en esta carpeta, vuelve a sincronizar con
 DESINSTALA pytest.
 
 
+SI "uv sync" FALLA CON "os error 396"
+
+El mensaje dice: "La operacion de nube no se puede realizar en un archivo con
+vinculos permanentes incompatibles". uv crea vinculos permanentes desde su
+cache para no guardar dos veces la misma wheel, y un cliente de sincronizacion
+en la nube no sabe representarlos. Anade --link-mode=copy:
+
+  uv sync --extra dev --extra desktop --link-mode=copy
+
+Y OJO: ese error significa que ALGO esta sincronizando esa carpeta. Eso es
+peligroso por si mismo -- lee el punto 0 -- y install.py no lo detecto, porque
+mira las variables de entorno y los nombres de carpeta de los clientes de
+sincronizacion, no el sistema de archivos. Comprueba si de verdad lo esta:
+
+  (Get-Item "C:\Camoufox Persistente").Attributes
+  $env:OneDrive
+
+Si los atributos incluyen ReparsePoint, Offline o RecallOnDataAccess, esa
+carpeta esta sincronizada y la base de perfiles corre peligro. Muevela.
+
+
 -------------------------------------------------------------------------------
 3. IDENTIDAD DE GIT (sin esto no puedes commitear)
 -------------------------------------------------------------------------------
