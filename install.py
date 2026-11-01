@@ -341,9 +341,17 @@ def sync_dependencies(uv: list[str], target: Path) -> None:
     # The filesystem may be unable to hardlink for reasons we cannot see from
     # the path alone -- a mapped drive, or a sync client we do not know about.
     # One retry that cannot hit the problem beats asking the user to diagnose it.
+    #
+    # --reinstall matters as much as the link mode. A sync that dies partway
+    # leaves the package it died on with a written-out .dist-info and no module
+    # beside it, and uv reads that directory as "installed": the retry then
+    # reports "Checked 78 packages", changes nothing, and exits 0. The install
+    # would be declared finished with a broken environment, which is worse than
+    # the failure it was recovering from. Reinstalling everything is the slow
+    # way round, but this only runs after something has already gone wrong.
     if "--link-mode=copy" not in base:
         warn("Falló la instalación; reintentando sin enlaces permanentes.")
-        if run_ok(base + ["--link-mode=copy"], cwd=target):
+        if run_ok(base + ["--link-mode=copy", "--reinstall"], cwd=target):
             return
 
     die(
