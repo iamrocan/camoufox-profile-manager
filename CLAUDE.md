@@ -161,6 +161,60 @@ Check the state with
 -- 0 off, 1 blocking, 2 evaluating -- and the signatures with
 `Get-AuthenticodeSignature`.
 
+## What the shortcut actually runs
+
+The Desktop shortcut does **not** call the CLI. It calls
+`scripts/prelaunch.py` on the venv's `pythonw.exe`, and that calls the CLI:
+
+```
+pythonw.exe "<install>\scripts\prelaunch.py" --desktop
+```
+
+It checks once a day for a newer **stable** browser build, moves onto it if
+there is one, removes every build except the active one, and then starts the
+manager. Arguments it does not recognise are forwarded, which is how `--desktop`
+arrives. `launch.vbs` goes the same way; `launch.bat` deliberately does not, so
+it stays a launcher that starts the manager and nothing else.
+
+Three things about it are load-bearing rather than incidental:
+
+**It never blocks the launch.** No network, GitHub rate-limiting the
+unauthenticated API, a download that dies halfway: every failure path ends with
+the manager opening anyway. The check runs under a timeout because
+`list_available_versions` walks three repositories at 20 seconds each, which is
+far longer than anyone waits for a window.
+
+**It does not download silently.** `pythonw.exe` has no console and the browser
+is a 1.3 GB download; doing that invisibly is indistinguishable from a shortcut
+that does nothing, which this project has already lost days to. So when there is
+something to fetch, prelaunch re-runs itself with `--run-update` in a **new
+console window** that says what is happening and shows camoufox's own progress
+bar, and that window launches the manager when it is done.
+
+**It starts the manager detached.** `DETACHED_PROCESS` plus a new process group.
+A child sharing its parent's console and job dies when the parent returns --
+which it does here, immediately, and the update window closes a few seconds
+later. Detaching leaves the manager without a console, so its output goes to
+`data/manager.log` instead of at handles that are not there; a shortcut-launched
+manager previously logged nowhere at all.
+
+Checking it without spending the 1.3 GB:
+
+```bash
+python scripts/prelaunch.py --check-only              # report, change nothing
+python scripts/prelaunch.py --force-check --dry-run   # whole flow, no download
+```
+
+`--no-update` skips the check. `scripts/diagnose.ps1` section 15 prints the tail
+of `data/prelaunch.log`, which is the only account of a windowless run.
+
+**The consequence worth knowing:** updating the browser does not touch pinned
+fingerprints, so every profile goes on reporting the Firefox it was created
+with. That is what `is_outdated()` and `refresh_browser_version()` are for, and
+the Máquina section of each profile offers the one-click fix. Making the update
+automatic means profiles now go stale on their own, where before the user moved
+browser and pins together.
+
 ## Translations
 
 `web/src/lib/i18n.tsx` holds both languages. `en` is the source of truth and

@@ -451,6 +451,17 @@ def create_shortcut(target: Path) -> Path | None:
         warn(f"no se encontró {pythonw}; se omite el acceso directo.")
         return None
 
+    # Through scripts/prelaunch.py, which updates the browser and prunes the old
+    # builds before handing over to the CLI. Falls back to calling the CLI
+    # directly if that file is not there, so a shortcut built against an older
+    # checkout still opens the app rather than failing on a missing script.
+    prelaunch = target / "scripts" / "prelaunch.py"
+    if prelaunch.is_file():
+        arguments = f'"{prelaunch}" --desktop'
+    else:
+        warn(f"no se encontró {prelaunch}; el acceso directo no buscará actualizaciones.")
+        arguments = "-m camoufox_pm.cli --desktop"
+
     # Built by PowerShell because the shortcut format is a COM object, and the
     # script is written to a file so no quoting has to survive two shells.
     ps = f"""
@@ -459,7 +470,7 @@ $link = Join-Path $desktop '{SHORTCUT_NAME}.lnk'
 $shell = New-Object -ComObject WScript.Shell
 $sc = $shell.CreateShortcut($link)
 $sc.TargetPath = '{pythonw}'
-$sc.Arguments = '-m camoufox_pm.cli --desktop'
+$sc.Arguments = '{arguments}'
 $sc.WorkingDirectory = '{target}'
 $sc.Description = 'Camoufox Profile Manager'
 {f"$sc.IconLocation = '{icon}'" if icon.is_file() else ""}

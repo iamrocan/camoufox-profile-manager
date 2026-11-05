@@ -133,4 +133,18 @@ if ($bv -match 'No module named') {
     if ($inst -eq 'Yes') { "instalado, " + $cur } else { "NO DESCARGADO  <-- descargalo con: .venv\Scripts\python.exe -m camoufox fetch" }
 }
 
+# prelaunch sits on the launch path and runs windowless, so when it goes wrong
+# it goes wrong invisibly. Its log is the only account of what happened.
+"=== 15 LANZADOR (prelaunch) ==="
+$pre = Join-Path $Dir 'scripts\prelaunch.py'
+"script     : " + $(if (Test-Path $pre) { "presente" } else { "FALTA  <-- el acceso directo no buscara actualizaciones" })
+$st = Join-Path $Dir 'data\prelaunch.json'
+if (Test-Path $st) {
+    try { "ultima comprobacion: " + (Get-Content $st -Raw | ConvertFrom-Json).last_check_iso } catch { "ultima comprobacion: ilegible" }
+} else { "ultima comprobacion: nunca" }
+$pl = Join-Path $Dir 'data\prelaunch.log'
+if (Test-Path $pl) { "--- prelaunch.log (ultimas 8) ---"; (Get-Content $pl -Tail 8 | Out-String).TrimEnd() } else { "prelaunch.log: no existe todavia" }
+$ml = Join-Path $Dir 'data\manager.log'
+if (Test-Path $ml) { "--- manager.log: ultimo error, si hay ---"; $e = Get-Content $ml -Tail 200 | Where-Object { $_ -match 'Traceback|ERROR|CRITICAL' } | Select-Object -Last 3; if ($e) { ($e | Out-String).TrimEnd() } else { "sin errores recientes" } } else { "manager.log: no existe todavia" }
+
 "=== FIN ==="

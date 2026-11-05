@@ -8,6 +8,9 @@ cd /d "%REPO_DIR%"
 echo [launch.bat] REPO_DIR=%REPO_DIR%
 echo [launch.bat] CPM_DB_PATH=%CPM_DB_PATH%
 echo.
+REM Deliberately does NOT go through scripts\prelaunch.py: this is the debug
+REM launcher, so it starts the manager and nothing else -- no update check, no
+REM pruning, no second process -- and its console shows the manager's own output.
 REM Call the venv's signed python.exe on the package, NOT camoufox-pm.exe: pip
 REM and uv build that stub on the machine, so it is unsigned and Windows 11's
 REM Smart App Control blocks it. We also do not use `uv run`: it re-resolves the
