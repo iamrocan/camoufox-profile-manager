@@ -192,28 +192,67 @@ def find_update() -> tuple[str, str, int] | None:
     return str(result["installed"]), str(result["available"]), int(result["size"])
 
 
+def installed_build() -> str | None:
+    """The build that is actually on disk and active, or None."""
+    try:
+        from camoufox.multiversion import get_active_path
+        from camoufox.pkgman import Version
+
+        active = get_active_path()
+        if active is None or not active.is_dir():
+            return None
+        return Version.from_path(active).full_string
+    except Exception:  # noqa: BLE001 - any failure means "cannot tell"
+        return None
+
+
 def update_browser(dry_run: bool = False) -> bool:
     """Move onto the newest stable build, through camoufox's own CLI.
 
-    Driven as a subprocess rather than reimplemented: the CLI already resolves
-    the channel, downloads, verifies the sha256 and flips the active version,
-    and its progress bar is the thing worth showing in the console window.
+    Two commands, not one. `camoufox set official/stable` only writes the
+    channel into config.json and returns -- the two-part specifier never
+    downloads anything, and it drops `active_version` on its way through. On its
+    own it leaves an install pointing at a build that is not there, which the
+    app reports as "official/stable is not installed". `fetch` is what puts the
+    build on disk.
+
+    Driven as subprocesses rather than reimplemented: the CLI resolves the
+    channel, downloads, verifies the sha256 and flips the active version, and
+    its progress bar is the thing worth showing in the console window.
+
+    Returns True only when a build is genuinely installed and active afterwards.
+    An exit code of 0 is not enough: that is exactly what the broken one-command
+    version returned while leaving nothing installed.
     """
-    cmd = [interpreter(console=True), "-m", "camoufox", "set", "official/stable"]
-    print(f"$ {subprocess.list2cmdline(cmd)}\n", flush=True)
+    steps = [
+        [interpreter(console=True), "-m", "camoufox", "set", "official/stable"],
+        [interpreter(console=True), "-m", "camoufox", "fetch"],
+    ]
+
     if dry_run:
-        # So the whole console flow can be checked on a machine without
-        # spending 1.3 GB on it. Nothing else about the run changes.
-        print("--dry-run: no se descarga nada.\n", flush=True)
+        for cmd in steps:
+            print(f"$ {subprocess.list2cmdline(cmd)}", flush=True)
+        print("\n--dry-run: no se descarga nada.\n", flush=True)
         log("update: --dry-run, no se ejecuto nada")
         return True
-    try:
-        code = subprocess.run(cmd, cwd=str(REPO_DIR)).returncode
-    except OSError as exc:
-        log(f"update: no se pudo ejecutar camoufox set ({exc})")
+
+    for cmd in steps:
+        print(f"\n$ {subprocess.list2cmdline(cmd)}\n", flush=True)
+        try:
+            code = subprocess.run(cmd, cwd=str(REPO_DIR)).returncode
+        except OSError as exc:
+            log(f"update: no se pudo ejecutar {cmd[3]} ({exc})")
+            return False
+        log(f"update: camoufox {cmd[3]} termino con codigo {code}")
+        if code != 0:
+            return False
+
+    landed = installed_build()
+    if landed is None:
+        log("update: termino sin dejar ningun build activo en disco")
         return False
-    log(f"update: camoufox set termino con codigo {code}")
-    return code == 0
+    log(f"update: activo y en disco: {landed}")
+    return True
 
 
 def dir_size(path: Path) -> int:
@@ -254,6 +293,19 @@ def prune_old_builds() -> tuple[int, int]:
         installed = list_installed()
     except Exception as exc:  # noqa: BLE001
         log(f"prune: no se pudo listar ({exc.__class__.__name__}: {exc})")
+        return 0, 0
+
+    # The guard that matters. "Not active" is what marks a build for deletion,
+    # so a config with no active_version in it makes *every* build look stale --
+    # and `camoufox set <repo>/<channel>` removes active_version. Run once in
+    # that state and this deletes every browser on the machine, which is exactly
+    # what it did before this check existed. No active build, no deleting.
+    if not any(build.is_active for build in installed):
+        log(f"prune: ninguna version figura como activa ({len(installed)} en disco); no se borra nada")
+        return 0, 0
+
+    # Nor the last one standing, whatever the flags say.
+    if len(installed) < 2:
         return 0, 0
 
     for build in installed:

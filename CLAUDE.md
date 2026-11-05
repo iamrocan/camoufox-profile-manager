@@ -198,6 +198,22 @@ later. Detaching leaves the manager without a console, so its output goes to
 `data/manager.log` instead of at handles that are not there; a shortcut-launched
 manager previously logged nowhere at all.
 
+`camoufox set <repo>/<channel>` **does not download anything.** The two-part
+specifier writes the channel into `config.json` and returns; only the form that
+names a version reaches the install path. Worse, it drops `active_version` on
+the way through. So `set` alone leaves an install pointing at a build that is
+not there -- the app says *"official/stable is not installed"* -- and it leaves
+`list_installed()` reporting every build as not-active. `fetch` is the half that
+puts a build on disk, and prelaunch runs both, then checks that something is
+genuinely active and on disk before believing it worked. An exit code of 0 is
+not evidence: that is what the `set`-only version returned while installing
+nothing.
+
+Which is why `prune_old_builds()` refuses to delete when no build is marked
+active. "Not active" is how a build is marked stale, so that state makes all of
+them look stale -- and it deleted every browser on the machine before the guard
+existed. It also never removes the last one standing.
+
 Checking it without spending the 1.3 GB:
 
 ```bash
@@ -207,6 +223,16 @@ python scripts/prelaunch.py --force-check --dry-run   # whole flow, no download
 
 `--no-update` skips the check. `scripts/diagnose.ps1` section 15 prints the tail
 of `data/prelaunch.log`, which is the only account of a windowless run.
+
+`--dry-run` proves the window, the forwarding and the launch; it cannot prove
+the download, which is the step that broke. Change anything in `update_browser`
+and run it for real once.
+
+To put a machine back together after an interrupted or half-done update:
+
+```bash
+.venv/Scripts/python.exe -m camoufox fetch
+```
 
 **The consequence worth knowing:** updating the browser does not touch pinned
 fingerprints, so every profile goes on reporting the Firefox it was created
