@@ -834,18 +834,16 @@ class ProfileManager:
         return profile
 
     async def set_force_dark_mode(self, profile_id: str, enabled: bool) -> Profile:
-        """Toggle whether pages see ``prefers-color-scheme: dark``.
+        """Toggle whether every site opens dark.
 
-        Future launches only. The media feature is set when the persistent
-        context is created, and Playwright's per-context emulation is not
-        something a running browser can be talked out of.
+        Two mechanisms, because neither covers the web on its own. The
+        ``prefers-color-scheme: dark`` preference gets a site to use the dark
+        theme its own designers built, which is always the better-looking
+        answer; Dark Reader recolours the sites that have no such theme, which
+        is most of them.
 
-        What it does and does not do is worth being precise about, because the
-        name promises more than the mechanism delivers: this tells sites the
-        user prefers a dark theme, so every site that *has* one uses it. A site
-        with no dark theme stays exactly as light as it was. Turning the whole
-        web dark regardless would mean recolouring pages, which is an extension,
-        not a preference.
+        Future launches only, on both halves: the media feature is set when the
+        persistent context is created, and Firefox loads its addons at startup.
         """
         profile = await self.get_profile(profile_id)
         if not profile:

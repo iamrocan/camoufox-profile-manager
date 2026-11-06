@@ -285,9 +285,9 @@ class Profile(BaseModel):
     # way to unload one from a running browser.
     ublock_disabled: bool = False
 
-    # Makes pages see `prefers-color-scheme: dark`, so every site that
-    # ships a dark theme picks it. A site with no dark theme stays light:
-    # this is a preference the page reads, not a filter over what it drew.
+    # Opens every site dark: the `prefers-color-scheme: dark` preference for
+    # the sites that have their own dark theme, and the Dark Reader extension
+    # recolouring the ones that do not. See core/dark_reader.py.
     #
     # On by default, including for profiles that existed before the column.
     # Worth knowing that this is a surface a page can read: Camoufox's own
@@ -367,10 +367,23 @@ class Profile(BaseModel):
                 "privacy.baselineFingerprintingProtection": False,
             }
         if self.force_dark_mode:
-            # Camoufox merges STOCK_MEDIA_DEFAULTS only for keys the caller
-            # did not pass, so naming color_scheme here replaces its
-            # "no-override" rather than fighting it.
+            # Two halves, because neither does the job alone.
+            #
+            # The preference, for the sites that respect it: Camoufox merges
+            # STOCK_MEDIA_DEFAULTS only for keys the caller did not pass, so
+            # naming color_scheme replaces its "no-override" rather than
+            # fighting it. A site with its own dark theme uses it, and uses the
+            # one its designers built rather than a recoloured approximation.
             options["color_scheme"] = "dark"
+
+            # And Dark Reader for everything else, which is most of the web.
+            # None when it could not be fetched -- the preference alone is a
+            # worse answer than both, and a far better one than not launching.
+            from camoufox_pm.core.dark_reader import ensure_dark_reader
+
+            addon = ensure_dark_reader()
+            if addon:
+                options.setdefault("addons", []).append(addon)
         if bs.window_width and bs.window_height:
             options["window"] = (bs.window_width, bs.window_height)
         if bs.fonts:

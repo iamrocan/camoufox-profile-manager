@@ -859,9 +859,10 @@ async def set_profile_startup_url(profile_id: str, body: StartupUrlRequest):
     summary="Turn forced dark mode on or off for this profile.",
     description=(
         "Flips the force_dark_mode flag. When true the browser reports "
-        "prefers-color-scheme: dark, so every site that ships a dark theme uses "
-        "it; a site without one is unaffected. Applies to future launches only: "
-        "the media feature is set when the context is created. Returns the "
+        "prefers-color-scheme: dark, so a site with its own dark theme uses it, "
+        "and the Dark Reader extension is loaded to recolour the ones without. "
+        "Applies to future launches only: the media feature is set when the "
+        "context is created and Firefox loads addons at startup. Returns the "
         "updated profile."
     ),
 )

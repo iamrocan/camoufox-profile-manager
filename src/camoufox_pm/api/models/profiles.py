@@ -160,10 +160,10 @@ class ProfileResponse(BaseModel):
     force_dark_mode: bool = Field(
         True,
         description=(
-            "When true, pages see prefers-color-scheme: dark, so every site "
-            "that ships a dark theme uses it. A site without one stays light. "
-            "Applies to future launches only. Toggled from "
-            "POST /profiles/{id}/dark-mode/toggle."
+            "When true, every site opens dark: pages see prefers-color-scheme: "
+            "dark so a site with its own dark theme uses it, and the Dark Reader "
+            "extension recolours the ones without. Applies to future launches "
+            "only. Toggled from POST /profiles/{id}/dark-mode/toggle."
         ),
     )
     startup_url: str | None = Field(

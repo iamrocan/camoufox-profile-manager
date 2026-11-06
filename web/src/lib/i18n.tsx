@@ -122,10 +122,10 @@ const en = {
   'ublock.toggleFailed': 'Could not change the uBlock setting',
   'darkMode.enabledTitle': 'Dark mode on',
   'darkMode.enabledBody':
-    '{name} will ask every site for its dark theme from the next launch. Sites without one are unchanged.',
+    '{name} will open every site dark from the next launch: its own dark theme where it has one, Dark Reader recolouring it where it does not.',
   'darkMode.disabledTitle': 'Dark mode off',
   'darkMode.disabledBody':
-    '{name} will stop asking for dark themes from the next launch.',
+    '{name} will open sites as they come from the next launch, and without the Dark Reader extension.',
   'darkMode.toggleFailed': 'Could not change the dark mode setting',
 
   // The page a profile opens on launch
@@ -629,10 +629,10 @@ const es: Record<MessageKey, string> = {
   'ublock.toggleFailed': 'No se pudo cambiar el ajuste de uBlock',
   'darkMode.enabledTitle': 'Modo oscuro activado',
   'darkMode.enabledBody':
-    '{name} pedirá su tema oscuro a cada sitio desde el próximo arranque. Los sitios que no tienen uno no cambian.',
+    '{name} abrirá todos los sitios en oscuro desde el próximo arranque: su propio tema oscuro donde lo tengan, y Dark Reader recoloreando donde no.',
   'darkMode.disabledTitle': 'Modo oscuro desactivado',
   'darkMode.disabledBody':
-    '{name} dejará de pedir tema oscuro desde el próximo arranque.',
+    '{name} abrirá los sitios tal como vengan desde el próximo arranque, y sin la extensión Dark Reader.',
   'darkMode.toggleFailed': 'No se pudo cambiar el ajuste de modo oscuro',
 
   'startup.title': 'Página de inicio',
