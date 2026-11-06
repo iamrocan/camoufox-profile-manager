@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-"""Update the browser, prune the old builds, then open the manager.
+"""Match the browser to this camoufox, prune the rest, then open the manager.
 
 Sits between the Desktop shortcut and `camoufox_pm.cli`. The shortcut used to
 call the CLI directly; it now calls this, and this calls the CLI.
 
+The target is the build the installed camoufox package **pairs with**, not the
+newest release. camoufox stamps each of its releases with the browser build it
+was built and tested against, and launching another one makes it warn that
+"other builds may not be compatible". The fingerprint patches are built against
+a particular browser, and an antidetect browser running an untested combination
+is the wrong kind of unusual. So the browser moves when the *package* moves --
+`git pull` plus `uv sync` -- and this keeps the two in step instead of running
+ahead of them. It will move the browser backwards to get there.
+
 Three rules shape the whole thing:
 
-**Never block the launch.** An update that cannot happen -- no network, GitHub
-rate-limiting the unauthenticated API, a download that dies halfway -- must end
-with the manager opening anyway. Every failure path here falls through to the
-launch, and the check runs under a timeout because `list_available_versions`
-walks three repositories with a 20-second timeout each, which is far longer than
-anyone will wait for a window to appear.
+**Never block the launch.** An update that cannot happen -- no network, a
+download that dies halfway, a camoufox that cannot be imported -- must end with
+the manager opening anyway, and every failure path here falls through to the
+launch. Deciding whether an update is needed costs no network at all: the pin is
+stamped into the installed package and the installed build is on disk.
 
 **Never work silently where the work is visible.** The shortcut runs
 `pythonw.exe`, which has no console, and the browser is a 1.3 GB download: doing
@@ -46,7 +54,6 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,12 +65,7 @@ LOG_FILE = REPO_DIR / "data" / "prelaunch.log"
 MANAGER_LOG = REPO_DIR / "data" / "manager.log"
 
 CHECK_EVERY_HOURS = 24
-CHECK_TIMEOUT_SECONDS = 20
 LOG_MAX_BYTES = 256 * 1024
-
-# Stable only. A prerelease is not what an unattended update should move someone
-# onto, and camoufox publishes them between stable builds.
-INCLUDE_PRERELEASE = False
 
 CREATE_NEW_CONSOLE = 0x00000010
 DETACHED_PROCESS = 0x00000008
@@ -138,58 +140,68 @@ def due_for_check(state: dict[str, Any]) -> bool:
 # --- the browser -------------------------------------------------------------
 
 
-def find_update() -> tuple[str, str, int] | None:
-    """(installed, available, bytes) when a newer stable build exists.
+def asset_size_of(full_string: str) -> int:
+    """Download size for a build, or 0 when it cannot be looked up.
 
-    Returns None for "nothing to do", including every failure: this runs on the
-    launch path, and a check that cannot answer must not stop the app opening.
+    Cosmetic -- it fills in a number in the console window. Read from the repo
+    cache on disk rather than from the API, so a stale or missing cache costs a
+    nicety rather than the update, and the launch path stays off the network.
     """
     try:
+        from camoufox.multiversion import load_repo_cache
+
+        for repo in load_repo_cache().get("repos", []):
+            for item in repo.get("versions", []):
+                if f"{item.get('version')}-{item.get('build')}" == full_string:
+                    return int(item.get("asset_size") or 0)
+    except Exception:  # noqa: BLE001
+        pass
+    return 0
+
+
+def find_update() -> tuple[str, str, int] | None:
+    """(installed, paired, bytes) when the browser is not the paired build.
+
+    Answered from the pin stamped into the installed camoufox and from what is
+    on disk, so the common case touches no network. Returns None for "nothing
+    to do", including every failure: this runs on the launch path, and a check
+    that cannot answer must not stop the app opening.
+    """
+    try:
+        from camoufox.browser_pin import load_pin
         from camoufox.multiversion import get_active_path
-        from camoufox.pkgman import Version, list_available_versions
+        from camoufox.pkgman import Version
     except Exception as exc:  # noqa: BLE001 - a missing dependency is "no update"
         log(f"check: camoufox no importable ({exc.__class__.__name__})")
         return None
 
-    result: dict[str, Any] = {}
-
-    def probe() -> None:
-        try:
-            active = get_active_path()
-            if active is None:
-                result["error"] = "no hay navegador instalado"
-                return
-            installed = Version.from_path(active)
-            available = list_available_versions(include_prerelease=INCLUDE_PRERELEASE)
-            if not available:
-                result["error"] = "la lista de versiones vino vacia"
-                return
-            newest = max(available, key=lambda item: item.version)
-            result["installed"] = installed.full_string
-            result["available"] = newest.version.full_string
-            result["size"] = newest.asset_size or 0
-            result["newer"] = newest.version > installed
-        except Exception as exc:  # noqa: BLE001 - network, API limit, bad data
-            result["error"] = f"{exc.__class__.__name__}: {exc}"
-
-    # Bounded because the call underneath walks three repositories with a
-    # 20-second timeout each, and nobody waits a minute for a window.
-    worker = threading.Thread(target=probe, daemon=True)
-    worker.start()
-    worker.join(CHECK_TIMEOUT_SECONDS)
-    if worker.is_alive():
-        log(f"check: sin respuesta en {CHECK_TIMEOUT_SECONDS}s; se abre sin comprobar")
+    try:
+        pin = load_pin()
+    except Exception as exc:  # noqa: BLE001
+        log(f"check: no se pudo leer el emparejamiento ({exc.__class__.__name__})")
         return None
 
-    if "error" in result:
-        log(f"check: {result['error']}")
+    if pin is None:
+        # A development copy of camoufox pairs with nothing, so there is no
+        # build to move onto and nothing to decide.
+        log("check: esta camoufox no declara build emparejado; nada que hacer")
         return None
 
-    if not result.get("newer"):
-        log(f"check: al dia ({result.get('installed')})")
+    installed = None
+    try:
+        active = get_active_path()
+        if active is not None and active.is_dir():
+            installed = Version.from_path(active).full_string
+    except Exception as exc:  # noqa: BLE001
+        log(f"check: no se pudo leer el build instalado ({exc.__class__.__name__})")
+
+    wanted = f"{pin.version}-{pin.build}"
+    if installed == wanted:
+        log(f"check: emparejado ({installed})")
         return None
 
-    return str(result["installed"]), str(result["available"]), int(result["size"])
+    log(f"check: instalado {installed}, emparejado {wanted}")
+    return installed or "ninguno", wanted, asset_size_of(wanted)
 
 
 def installed_build() -> str | None:
@@ -207,14 +219,13 @@ def installed_build() -> str | None:
 
 
 def update_browser(dry_run: bool = False) -> bool:
-    """Move onto the newest stable build, through camoufox's own CLI.
+    """Move onto the paired build, through camoufox's own CLI.
 
-    Two commands, not one. `camoufox set official/stable` only writes the
-    channel into config.json and returns -- the two-part specifier never
-    downloads anything, and it drops `active_version` on its way through. On its
-    own it leaves an install pointing at a build that is not there, which the
-    app reports as "official/stable is not installed". `fetch` is what puts the
-    build on disk.
+    `set --release` drops any explicit choice so the stamped pin decides which
+    build is wanted, and `fetch` installs it. Two commands, not one: `set` never
+    downloads on its own -- it writes config.json and returns, dropping
+    `active_version` on the way, which leaves the install pointing at a build
+    that is not there and the app reporting it as "not installed".
 
     Driven as subprocesses rather than reimplemented: the CLI resolves the
     channel, downloads, verifies the sha256 and flips the active version, and
@@ -225,7 +236,7 @@ def update_browser(dry_run: bool = False) -> bool:
     version returned while leaving nothing installed.
     """
     steps = [
-        [interpreter(console=True), "-m", "camoufox", "set", "official/stable"],
+        [interpreter(console=True), "-m", "camoufox", "set", "--release"],
         [interpreter(console=True), "-m", "camoufox", "fetch"],
     ]
 
@@ -404,7 +415,7 @@ def run_update_mode(forwarded: list[str], dry_run: bool = False) -> int:
         pass
 
     print("=" * 68)
-    print("  Camoufox Profile Manager — actualizando el navegador")
+    print("  Camoufox Profile Manager — ajustando la versión del navegador")
     print("=" * 68)
     print()
 
@@ -416,16 +427,20 @@ def run_update_mode(forwarded: list[str], dry_run: bool = False) -> int:
         print("Se abre la aplicación normalmente.")
         print(f"\nDetalle en: {LOG_FILE}")
     else:
-        installed, available, size = found
-        print(f"  Versión instalada : {installed}")
-        print(f"  Versión nueva     : {available}")
-        print(f"  Descarga          : {size / 1e9:.2f} GB")
+        installed, wanted, size = found
+        print(f"  Versión instalada  : {installed}")
+        print(f"  Versión emparejada : {wanted}")
+        if size:
+            print(f"  Descarga           : {size / 1e9:.2f} GB")
+        print()
+        print("Esa es la versión con la que esta camoufox fue construida y probada.")
+        print("No es necesariamente la más nueva, y esa es justamente la idea.")
         print()
         print("No cierres esta ventana. La aplicación se abrirá al terminar.")
         print()
 
         if update_browser(dry_run=dry_run):
-            print("\nNavegador actualizado.")
+            print("\nNavegador ajustado.")
             removed, freed = (0, 0) if dry_run else prune_old_builds()
             if dry_run:
                 print("--dry-run: no se purga ninguna version.")
@@ -437,7 +452,7 @@ def run_update_mode(forwarded: list[str], dry_run: bool = False) -> int:
             print("       en la sección Máquina de cada perfil, con un botón para")
             print("       actualizarlos sin cambiar la máquina.")
         else:
-            print("\nLa actualización falló. Se abre la aplicación con la versión actual.")
+            print("\nNo se pudo ajustar. Se abre la aplicación con la versión actual.")
             print(f"Detalle en: {LOG_FILE}")
 
     write_state({"last_check": time.time(), "last_check_iso": datetime.now(timezone.utc).isoformat()})
@@ -463,10 +478,10 @@ def main() -> int:
             print("Sin actualizaciones pendientes (o no se pudo comprobar).")
             print(f"Ver {LOG_FILE}")
             return 0
-        installed, available, size = found
-        print(f"Instalada : {installed}")
-        print(f"Disponible: {available}")
-        print(f"Descarga  : {size / 1e9:.2f} GB")
+        installed, wanted, size = found
+        print(f"Instalada  : {installed}")
+        print(f"Emparejada : {wanted}")
+        print(f"Descarga   : {size / 1e9:.2f} GB")
         try:
             from camoufox.multiversion import list_installed
 

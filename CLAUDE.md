@@ -170,11 +170,27 @@ The Desktop shortcut does **not** call the CLI. It calls
 pythonw.exe "<install>\scripts\prelaunch.py" --desktop
 ```
 
-It checks once a day for a newer **stable** browser build, moves onto it if
-there is one, removes every build except the active one, and then starts the
-manager. Arguments it does not recognise are forwarded, which is how `--desktop`
-arrives. `launch.vbs` goes the same way; `launch.bat` deliberately does not, so
-it stays a launcher that starts the manager and nothing else.
+It checks once a day whether the browser on disk is the build this camoufox
+**pairs with**, moves onto that build if not, removes every other build, and
+then starts the manager. Arguments it does not recognise are forwarded, which is
+how `--desktop` arrives. `launch.vbs` goes the same way; `launch.bat`
+deliberately does not, so it stays a launcher that starts the manager and
+nothing else.
+
+**The target is the paired build, not the newest one.** camoufox stamps each of
+its releases with the browser build it was built and tested against --
+`camoufox.browser_pin.load_pin()` reads it -- and launching any other build
+makes camoufox warn that *"other builds may not be compatible"* and tell you to
+run `camoufox set --release`. The fingerprint patches are built against a
+particular browser, so an antidetect browser running an untested combination is
+the wrong kind of unusual. The browser therefore moves when the *package* moves
+(`git pull` plus `uv sync`), and prelaunch keeps the two in step rather than
+running ahead of them -- **including moving the browser backwards** to get
+there, which is what it did when an earlier version of this chased the newest
+stable and left the install two releases ahead of its package.
+
+So "is our browser the latest?" is the wrong question to optimise for. Being
+behind the newest release is the normal, intended state.
 
 Three things about it are load-bearing rather than incidental:
 
@@ -198,9 +214,10 @@ later. Detaching leaves the manager without a console, so its output goes to
 `data/manager.log` instead of at handles that are not there; a shortcut-launched
 manager previously logged nowhere at all.
 
-`camoufox set <repo>/<channel>` **does not download anything.** The two-part
-specifier writes the channel into `config.json` and returns; only the form that
-names a version reaches the install path. Worse, it drops `active_version` on
+`camoufox set --release` and `camoufox set <repo>/<channel>` **do not download
+anything.** They write `config.json` and return; only the form that names a
+version reaches the install path, and `fetch` is the half that puts a build on
+disk. Worse, it drops `active_version` on
 the way through. So `set` alone leaves an install pointing at a build that is
 not there -- the app says *"official/stable is not installed"* -- and it leaves
 `list_installed()` reporting every build as not-active. `fetch` is the half that
