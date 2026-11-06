@@ -147,4 +147,25 @@ if (Test-Path $pl) { "--- prelaunch.log (ultimas 8) ---"; (Get-Content $pl -Tail
 $ml = Join-Path $Dir 'data\manager.log'
 if (Test-Path $ml) { "--- manager.log: ultimo error, si hay ---"; $e = Get-Content $ml -Tail 200 | Where-Object { $_ -match 'Traceback|ERROR|CRITICAL' } | Select-Object -Last 3; if ($e) { ($e | Out-String).TrimEnd() } else { "sin errores recientes" } } else { "manager.log: no existe todavia" }
 
+# The trap this catches: the interface is read from disk on every request, so a
+# running manager serves the NEW page while still running the OLD Python. The
+# menu item appears, the route behind it does not exist, and the feature looks
+# broken rather than stale. Asking the running server what routes it has is the
+# only way to tell those two apart from outside.
+"=== 16 MODO OSCURO ==="
+$addon = Join-Path $env:LOCALAPPDATA 'camoufox\camoufox\Cache\addons\DARKREADER\manifest.json'
+"Dark Reader descargado : " + $(if (Test-Path $addon) { "si" } else { "no (se baja al primer arranque con modo oscuro)" })
+$code = Join-Path $Dir 'src\camoufox_pm\core\dark_reader.py'
+"codigo en disco        : " + $(if (Test-Path $code) { "al dia" } else { "ANTIGUO  <-- falta git pull" })
+$running = $false
+foreach ($port in 8000, 8080) {
+    $oa = try { Invoke-WebRequest -Uri "http://127.0.0.1:$port/openapi.json" -UseBasicParsing -TimeoutSec 4 } catch { $null }
+    if ($oa) {
+        $running = $true
+        $has = $oa.Content -match 'dark-mode/toggle'
+        "manager en :$port      : " + $(if ($has) { "sirve la ruta nueva, correcto" } else { "NO conoce la ruta  <-- CIERRA Y REABRE EL MANAGER" })
+    }
+}
+if (-not $running) { "manager                : no hay ninguno abierto ahora mismo" }
+
 "=== FIN ==="
