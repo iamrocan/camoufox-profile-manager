@@ -157,6 +157,15 @@ class ProfileResponse(BaseModel):
             "Toggled from POST /profiles/{id}/ublock/toggle."
         ),
     )
+    force_dark_mode: bool = Field(
+        True,
+        description=(
+            "When true, pages see prefers-color-scheme: dark, so every site "
+            "that ships a dark theme uses it. A site without one stays light. "
+            "Applies to future launches only. Toggled from "
+            "POST /profiles/{id}/dark-mode/toggle."
+        ),
+    )
     startup_url: str | None = Field(
         None,
         description=(
@@ -212,6 +221,7 @@ class ProfileResponse(BaseModel):
             proxy_config=profile.proxy.model_dump() if profile.proxy else None,
             proxy_paused=profile.proxy_paused,
             ublock_disabled=profile.ublock_disabled,
+            force_dark_mode=profile.force_dark_mode,
             startup_url=profile.startup_url,
             storage_path=profile.storage_path,
             notes=profile.notes,

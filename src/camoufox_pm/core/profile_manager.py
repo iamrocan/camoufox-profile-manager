@@ -833,6 +833,44 @@ class ProfileManager:
         )
         return profile
 
+    async def set_force_dark_mode(self, profile_id: str, enabled: bool) -> Profile:
+        """Toggle whether pages see ``prefers-color-scheme: dark``.
+
+        Future launches only. The media feature is set when the persistent
+        context is created, and Playwright's per-context emulation is not
+        something a running browser can be talked out of.
+
+        What it does and does not do is worth being precise about, because the
+        name promises more than the mechanism delivers: this tells sites the
+        user prefers a dark theme, so every site that *has* one uses it. A site
+        with no dark theme stays exactly as light as it was. Turning the whole
+        web dark regardless would mean recolouring pages, which is an extension,
+        not a preference.
+        """
+        profile = await self.get_profile(profile_id)
+        if not profile:
+            raise ValueError(f"Profile with ID {profile_id} not found")
+
+        if profile.force_dark_mode == enabled:
+            return profile  # no-op, no bump
+
+        profile.force_dark_mode = enabled
+        profile.updated_at = datetime.now()
+        # Version-checked, same rationale as set_proxy_paused above.
+        await self.storage.update_profile(profile, expected_row_version=profile.row_version)
+
+        await self.storage.log_usage(
+            UsageStats(
+                profile_id=profile_id,
+                action="dark_mode_enabled" if enabled else "dark_mode_disabled",
+            )
+        )
+        logger.info(
+            f"Forced dark mode {'enabled' if enabled else 'disabled'} for profile "
+            f"{profile_id} (applies on the next launch)"
+        )
+        return profile
+
     async def clear_profile_data(self, profile_id: str) -> dict[str, Any]:
         """Wipe a profile's browser data (cookies, cache, history, storage,
         session, downloads, ...) while leaving the profile's identity intact.

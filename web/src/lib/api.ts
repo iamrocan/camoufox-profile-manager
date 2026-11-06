@@ -79,6 +79,7 @@ export interface Profile {
   /** When true the launcher ignores proxy_config and starts the browser direct. */
   proxy_paused?: boolean
   ublock_disabled?: boolean
+  force_dark_mode?: boolean
   startup_url?: string | null
   storage_path?: string | null
   notes?: string | null
@@ -270,6 +271,12 @@ export const profilesAPI = {
 
   toggleUblock(id: string): Promise<Profile> {
     return request<Profile>(`${API_PREFIX}/profiles/${id}/ublock/toggle`, { method: 'POST' })
+  },
+
+  toggleDarkMode(id: string): Promise<Profile> {
+    return request<Profile>(`${API_PREFIX}/profiles/${id}/dark-mode/toggle`, {
+      method: 'POST',
+    })
   },
 
   setStartupUrl(id: string, url: string | null): Promise<Profile> {

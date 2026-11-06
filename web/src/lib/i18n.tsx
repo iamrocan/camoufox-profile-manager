@@ -85,6 +85,8 @@ const en = {
   'action.resumeProxy': 'Resume proxy',
   'action.disableUblock': 'Disable uBlock',
   'action.enableUblock': 'Enable uBlock',
+  'action.disableDarkMode': 'Turn off dark mode',
+  'action.enableDarkMode': 'Turn on dark mode',
   'action.setStartupUrl': 'Set startup page',
   'action.changeStartupUrl': 'Change startup page',
   'action.export': 'Export…',
@@ -118,6 +120,13 @@ const en = {
   'ublock.enabledTitle': 'uBlock enabled',
   'ublock.enabledBody': '{name} will open with the ad blocker again from the next launch.',
   'ublock.toggleFailed': 'Could not change the uBlock setting',
+  'darkMode.enabledTitle': 'Dark mode on',
+  'darkMode.enabledBody':
+    '{name} will ask every site for its dark theme from the next launch. Sites without one are unchanged.',
+  'darkMode.disabledTitle': 'Dark mode off',
+  'darkMode.disabledBody':
+    '{name} will stop asking for dark themes from the next launch.',
+  'darkMode.toggleFailed': 'Could not change the dark mode setting',
 
   // The page a profile opens on launch
   'startup.title': 'Startup page',
@@ -584,6 +593,8 @@ const es: Record<MessageKey, string> = {
   'action.resumeProxy': 'Reanudar proxy',
   'action.disableUblock': 'Desactivar uBlock',
   'action.enableUblock': 'Activar uBlock',
+  'action.disableDarkMode': 'Desactivar modo oscuro',
+  'action.enableDarkMode': 'Activar modo oscuro',
   'action.setStartupUrl': 'Definir página de inicio',
   'action.changeStartupUrl': 'Cambiar página de inicio',
   'action.export': 'Exportar…',
@@ -616,6 +627,13 @@ const es: Record<MessageKey, string> = {
   'ublock.enabledBody':
     '{name} volverá a abrirse con el bloqueador de anuncios desde el próximo inicio.',
   'ublock.toggleFailed': 'No se pudo cambiar el ajuste de uBlock',
+  'darkMode.enabledTitle': 'Modo oscuro activado',
+  'darkMode.enabledBody':
+    '{name} pedirá su tema oscuro a cada sitio desde el próximo arranque. Los sitios que no tienen uno no cambian.',
+  'darkMode.disabledTitle': 'Modo oscuro desactivado',
+  'darkMode.disabledBody':
+    '{name} dejará de pedir tema oscuro desde el próximo arranque.',
+  'darkMode.toggleFailed': 'No se pudo cambiar el ajuste de modo oscuro',
 
   'startup.title': 'Página de inicio',
   'startup.hint':

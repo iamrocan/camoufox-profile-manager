@@ -853,6 +853,41 @@ async def set_profile_startup_url(profile_id: str, body: StartupUrlRequest):
 
 
 @router.post(
+    "/profiles/{profile_id}/dark-mode/toggle",
+    response_model=ProfileResponse,
+    operation_id="toggle_profile_dark_mode",
+    summary="Turn forced dark mode on or off for this profile.",
+    description=(
+        "Flips the force_dark_mode flag. When true the browser reports "
+        "prefers-color-scheme: dark, so every site that ships a dark theme uses "
+        "it; a site without one is unaffected. Applies to future launches only: "
+        "the media feature is set when the context is created. Returns the "
+        "updated profile."
+    ),
+)
+async def toggle_profile_dark_mode(profile_id: str):
+    """Toggle whether pages see prefers-color-scheme: dark."""
+    try:
+        profile_manager = get_profile_manager()
+        profile = await profile_manager.get_profile(profile_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail=f"Profile with ID {profile_id} not found")
+        updated = await profile_manager.set_force_dark_mode(
+            profile_id, not profile.force_dark_mode
+        )
+        return ProfileResponse.from_profile(updated)
+    except HTTPException:
+        raise
+    except StaleWriteError:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f"Failed to toggle dark mode for profile {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post(
     "/profiles/{profile_id}/ublock/toggle",
     response_model=ProfileResponse,
     operation_id="toggle_profile_ublock",

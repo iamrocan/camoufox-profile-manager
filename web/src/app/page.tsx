@@ -11,6 +11,7 @@ import {
   Ellipsis,
   Eraser,
   Globe,
+  Moon,
   PackageOpen,
   Pause,
   Pencil,
@@ -21,6 +22,7 @@ import {
   Shield,
   ShieldOff,
   Square,
+  Sun,
   Trash2,
   Upload,
   Users,
@@ -434,6 +436,22 @@ export default function ProfilesPage() {
       loadProfiles()
     } catch (err) {
       toast('error', t('proxy.toggleFailed'), String(err))
+    }
+  }
+
+  async function toggleDarkMode(profile: Profile) {
+    try {
+      const updated = await profilesAPI.toggleDarkMode(profile.id)
+      toast(
+        'ok',
+        t(updated.force_dark_mode ? 'darkMode.enabledTitle' : 'darkMode.disabledTitle'),
+        t(updated.force_dark_mode ? 'darkMode.enabledBody' : 'darkMode.disabledBody', {
+          name: profile.name,
+        }),
+      )
+      loadProfiles()
+    } catch (err) {
+      toast('error', t('darkMode.toggleFailed'), String(err))
     }
   }
 
@@ -970,6 +988,24 @@ export default function ProfilesPage() {
                               )}
                               onClick={() => {
                                 toggleUblock(profile)
+                                closeMenu(profile.id)
+                              }}
+                            />
+                            <MenuItem
+                              icon={
+                                profile.force_dark_mode ? (
+                                  <Sun size={13} />
+                                ) : (
+                                  <Moon size={13} />
+                                )
+                              }
+                              label={t(
+                                profile.force_dark_mode
+                                  ? 'action.disableDarkMode'
+                                  : 'action.enableDarkMode',
+                              )}
+                              onClick={() => {
+                                toggleDarkMode(profile)
                                 closeMenu(profile.id)
                               }}
                             />

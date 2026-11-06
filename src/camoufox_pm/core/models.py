@@ -285,6 +285,19 @@ class Profile(BaseModel):
     # way to unload one from a running browser.
     ublock_disabled: bool = False
 
+    # Makes pages see `prefers-color-scheme: dark`, so every site that
+    # ships a dark theme picks it. A site with no dark theme stays light:
+    # this is a preference the page reads, not a filter over what it drew.
+    #
+    # On by default, including for profiles that existed before the column.
+    # Worth knowing that this is a surface a page can read: Camoufox's own
+    # default is Playwright's `no-override`, where the page sees whatever
+    # the host is set to. Forcing dark means every profile answers dark
+    # regardless of the machine -- which is an ordinary answer, about half
+    # of real users, but it is an answer we are choosing rather than one
+    # the host gave.
+    force_dark_mode: bool = True
+
     # Opened in the first tab on every launch. None means Camoufox's own blank
     # page, which is what it has always done. Validated on the way in by
     # normalise_startup_url: this is replayed automatically every time the
@@ -353,6 +366,11 @@ class Profile(BaseModel):
             options["firefox_user_prefs"] = {
                 "privacy.baselineFingerprintingProtection": False,
             }
+        if self.force_dark_mode:
+            # Camoufox merges STOCK_MEDIA_DEFAULTS only for keys the caller
+            # did not pass, so naming color_scheme here replaces its
+            # "no-override" rather than fighting it.
+            options["color_scheme"] = "dark"
         if bs.window_width and bs.window_height:
             options["window"] = (bs.window_width, bs.window_height)
         if bs.fonts:
