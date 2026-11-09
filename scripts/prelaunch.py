@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Match the browser to this camoufox, prune the rest, then open the manager.
+"""Bring the install up to date, match the browser to it, then open the manager.
 
 Sits between the Desktop shortcut and `camoufox_pm.cli`. The shortcut used to
 call the CLI directly; it now calls this, and this calls the CLI.
@@ -33,9 +33,20 @@ nothing to download it stays as silent as before.
 diagnosable afterwards, so every run appends a line to `data/prelaunch.log` and
 `scripts/diagnose.ps1` prints the tail of it.
 
-The check is rate-limited to once every CHECK_EVERY_HOURS so that launching the
-app twice in a row does not hit the network twice, and so the usual launch costs
-nothing at all.
+Two things are checked on **every** launch, because a check that silently skips
+itself is indistinguishable from one that is not there:
+
+*The code*, with `git fetch` and a fast-forward pull. The manager is started
+afterwards, so a pull takes effect immediately -- which is the whole point, since
+the running process is what serves the API and it reads its Python once, at
+startup. Only ever fast-forward, only on a clean tree, and never when the branch
+is ahead of its upstream: that is a machine with work on it, and this is not
+entitled to touch it.
+
+*The browser*, which costs nothing to decide: the pin is stamped into the
+installed package and the build is on disk, so it is two local reads. It runs
+after the code update on purpose -- a pull that moves camoufox moves the pin with
+it, and then the browser that matches is a different one.
 
     --force-check   check now, whatever the last check says
     --check-only    report what it would do, touch nothing, launch nothing
@@ -52,6 +63,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -64,7 +76,11 @@ STATE_FILE = REPO_DIR / "data" / "prelaunch.json"
 LOG_FILE = REPO_DIR / "data" / "prelaunch.log"
 MANAGER_LOG = REPO_DIR / "data" / "manager.log"
 
-CHECK_EVERY_HOURS = 24
+# Bounded rather than skipped. A `git fetch` is a second or two online and fails
+# fast offline, but a captive portal can hang it, and nobody waits for that to
+# find out whether their browser profile manager will open.
+GIT_TIMEOUT_SECONDS = 15
+SYNC_TIMEOUT_SECONDS = 900
 LOG_MAX_BYTES = 256 * 1024
 
 CREATE_NEW_CONSOLE = 0x00000010
@@ -130,11 +146,129 @@ def interpreter(console: bool) -> str:
     return str(exe)
 
 
-def due_for_check(state: dict[str, Any]) -> bool:
-    last = state.get("last_check")
-    if not isinstance(last, (int, float)):
-        return True
-    return (time.time() - last) >= CHECK_EVERY_HOURS * 3600
+# --- the code ----------------------------------------------------------------
+
+
+def git_exe() -> str | None:
+    return shutil.which("git")
+
+
+def run_git(args: list[str], timeout: int = GIT_TIMEOUT_SECONDS) -> tuple[int, str]:
+    """Run a git command in the install and return (code, trimmed output)."""
+    git = git_exe()
+    if git is None:
+        return 127, "git no esta instalado"
+    try:
+        done = subprocess.run(
+            [git, *args],
+            cwd=str(REPO_DIR),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return 124, f"git {args[0]} no respondio en {timeout}s"
+    except OSError as exc:
+        return 126, str(exc)
+    return done.returncode, ((done.stdout or "") + (done.stderr or "")).strip()
+
+
+def find_code_update() -> int | None:
+    """How many commits behind the upstream branch, or None to leave it alone.
+
+    None covers every reason not to pull, and most of them are not failures:
+    an install that is not a git clone, a tree with uncommitted changes, a
+    branch with local commits on it, no upstream, no network. A developer's
+    machine lands in several of those, and should: this is allowed to fast
+    forward an install, not to touch work in progress.
+    """
+    if not (REPO_DIR / ".git").is_dir():
+        log("code: la instalacion no es un clon de git; no se actualiza sola")
+        return None
+
+    code, out = run_git(["status", "--porcelain"])
+    if code != 0:
+        log(f"code: git status fallo ({out[:160]})")
+        return None
+    if out:
+        log(f"code: hay cambios sin commitear ({len(out.splitlines())} archivos); no se toca")
+        return None
+
+    code, upstream = run_git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    if code != 0:
+        log("code: la rama no sigue a ninguna remota; no se actualiza sola")
+        return None
+
+    code, out = run_git(["fetch", "--quiet"])
+    if code != 0:
+        log(f"code: git fetch fallo ({out[:160]})")
+        return None
+
+    code, counts = run_git(["rev-list", "--left-right", "--count", f"HEAD...{upstream}"])
+    if code != 0:
+        log(f"code: no se pudo comparar con {upstream} ({counts[:160]})")
+        return None
+    try:
+        ahead_s, behind_s = counts.split()
+        ahead, behind = int(ahead_s), int(behind_s)
+    except ValueError:
+        log(f"code: respuesta inesperada de rev-list ({counts[:80]})")
+        return None
+
+    if ahead:
+        # Local commits that are not upstream: a machine being worked on.
+        log(f"code: {ahead} commit(s) locales sin subir; no se actualiza sola")
+        return None
+    if not behind:
+        log(f"code: al dia con {upstream}")
+        return None
+
+    log(f"code: {behind} commit(s) por detras de {upstream}")
+    return behind
+
+
+def update_code() -> bool:
+    """Fast-forward the install, and re-sync dependencies if the lock moved.
+
+    Returns whether anything was pulled. Dependency changes matter because the
+    manager is about to start: a pull that adds an import without the package
+    behind it produces a manager that will not boot, which is a worse state
+    than the one before the pull.
+    """
+    before_code, before = run_git(["rev-parse", "HEAD"])
+    cmd = [git_exe() or "git", "pull", "--ff-only"]
+    print(f"\n$ {subprocess.list2cmdline(cmd)}\n", flush=True)
+    code, out = run_git(["pull", "--ff-only"], timeout=120)
+    print(out, flush=True)
+    if code != 0:
+        log(f"code: git pull fallo ({out[:200]})")
+        return False
+
+    after_code, after = run_git(["rev-parse", "HEAD"])
+    if before_code or after_code or before == after:
+        log("code: pull sin cambios")
+        return False
+    log(f"code: {before[:8]} -> {after[:8]}")
+
+    changed_code, changed = run_git(["diff", "--name-only", f"{before}..{after}"])
+    files = changed.splitlines() if changed_code == 0 else []
+    if any(f in ("uv.lock", "pyproject.toml") for f in files):
+        print("\nLas dependencias cambiaron. Sincronizando…\n", flush=True)
+        sync = [interpreter(console=True), "-m", "uv", "sync", "--extra", "desktop",
+                "--link-mode=copy"]
+        print(f"$ {subprocess.list2cmdline(sync)}\n", flush=True)
+        try:
+            rc = subprocess.run(sync, cwd=str(REPO_DIR), timeout=SYNC_TIMEOUT_SECONDS).returncode
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            log(f"code: uv sync no se pudo ejecutar ({exc})")
+            print("\nNo se pudieron sincronizar las dependencias.")
+            print("Ejecuta a mano:  uv sync --extra desktop --link-mode=copy\n")
+            return True
+        log(f"code: uv sync termino con codigo {rc}")
+        if rc != 0:
+            print("\nLa sincronizacion de dependencias fallo.")
+            print("Ejecuta a mano:  uv sync --extra desktop --link-mode=copy\n")
+    return True
 
 
 # --- the browser -------------------------------------------------------------
@@ -415,15 +549,26 @@ def run_update_mode(forwarded: list[str], dry_run: bool = False) -> int:
         pass
 
     print("=" * 68)
-    print("  Camoufox Profile Manager — ajustando la versión del navegador")
+    print("  Camoufox Profile Manager — actualizando")
     print("=" * 68)
-    print()
 
+    # Code first, and the browser only afterwards: a pull that moves camoufox
+    # moves the build it pairs with, so asking before the pull would answer
+    # about the version being replaced.
+    behind = find_code_update()
+    if behind:
+        print(f"\n  Hay {behind} actualización(es) de la aplicación. Descargando…")
+        if dry_run:
+            print("  --dry-run: no se actualiza el código.")
+        elif update_code():
+            print("\n  Aplicación actualizada.")
+
+    print()
     found = find_update()
     if found is None:
         # The window is open, so say why nothing is happening rather than
         # flashing shut and leaving it a mystery.
-        print("No hay actualizaciones pendientes, o no se pudo comprobar.")
+        print("El navegador ya es el que corresponde a esta versión.")
         print("Se abre la aplicación normalmente.")
         print(f"\nDetalle en: {LOG_FILE}")
     else:
@@ -473,9 +618,11 @@ def main() -> int:
         return run_update_mode(forwarded, dry_run="--dry-run" in flags)
 
     if "--check-only" in flags:
+        behind = find_code_update()
+        print(f"Codigo     : {behind} commit(s) por detras" if behind else "Codigo     : al dia (o no actualizable; ver el log)")
         found = find_update()
         if found is None:
-            print("Sin actualizaciones pendientes (o no se pudo comprobar).")
+            print("Navegador  : emparejado")
             print(f"Ver {LOG_FILE}")
             return 0
         installed, wanted, size = found
@@ -491,21 +638,24 @@ def main() -> int:
             pass
         return 0
 
-    state = read_state()
-
     if "--no-update" in flags:
         log("launch: --no-update")
         return launch_manager(forwarded)
 
-    if not ("--force-check" in flags or due_for_check(state)):
-        return launch_manager(forwarded)
-
-    found = find_update()
+    state = read_state()
     state["last_check"] = time.time()
     state["last_check_iso"] = datetime.now(timezone.utc).isoformat()
     write_state(state)
 
-    if found is not None:
+    # Both on every launch. The browser comparison is two local reads; the code
+    # one is a bounded fetch. Neither is gated behind an interval any more --
+    # the old daily gate came from a check that hit the GitHub API, and all it
+    # does now is make a launch that skipped silently look like one that is not
+    # checking at all.
+    behind = find_code_update()
+    found = None if behind else find_update()
+
+    if behind or found is not None:
         return spawn_update_console(forwarded, dry_run="--dry-run" in flags)
 
     # Nothing to download. Start the manager first and tidy up behind it, so the

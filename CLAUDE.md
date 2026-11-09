@@ -170,12 +170,34 @@ The Desktop shortcut does **not** call the CLI. It calls
 pythonw.exe "<install>\scripts\prelaunch.py" --desktop
 ```
 
-It checks once a day whether the browser on disk is the build this camoufox
-**pairs with**, moves onto that build if not, removes every other build, and
-then starts the manager. Arguments it does not recognise are forwarded, which is
-how `--desktop` arrives. `launch.vbs` goes the same way; `launch.bat`
+On **every** launch it fast-forwards the install, then matches the browser to
+it, then starts the manager. Arguments it does not recognise are forwarded,
+which is how `--desktop` arrives. `launch.vbs` goes the same way; `launch.bat`
 deliberately does not, so it stays a launcher that starts the manager and
 nothing else.
+
+Nothing is behind an interval. There used to be a daily gate, from when the
+browser check hit the GitHub API; the check is local now, and all the gate did
+was make a launch that skipped silently look like one that was not checking at
+all. That is a real cost: it is indistinguishable from the feature being broken,
+and it was reported as such.
+
+**The code update is deliberately timid.** `git pull --ff-only`, and only when
+the tree is clean, the branch tracks an upstream, and there are no local commits
+on it. A machine being worked on fails several of those and should: this is
+allowed to fast-forward an install, not to touch work in progress. Every refusal
+says which one it was in `data/prelaunch.log`, because "it did not update" with
+no reason given is the thing being fixed here.
+
+The manager starts *after* the pull, which is what makes it take effect -- the
+running process reads its Python once, at startup. And when the pull moves
+`uv.lock` or `pyproject.toml`, the dependencies are synced before launching: a
+pull that adds an import without the package behind it leaves a manager that
+will not boot, which is worse than the state before the pull.
+
+The browser is checked **after** the code, on purpose. A pull that moves
+camoufox moves the build it pairs with, so asking first would answer about the
+version being replaced.
 
 **The target is the paired build, not the newest one.** camoufox stamps each of
 its releases with the browser build it was built and tested against --
