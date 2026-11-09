@@ -214,6 +214,42 @@ stable and left the install two releases ahead of its package.
 So "is our browser the latest?" is the wrong question to optimise for. Being
 behind the newest release is the normal, intended state.
 
+### Updating the browser means updating camoufox
+
+There is no separate browser update, and no version of this to pick by hand.
+The pin moves when the package moves, so the whole operation is:
+
+```bash
+uv lock --upgrade-package camoufox
+uv run --extra dev --extra desktop pytest -q
+```
+
+and the launcher fetches the matching build on the next launch. Run the tests
+before committing the lock, because the browser is where the fingerprinting
+lives and the suite is what notices.
+
+**0.5.9 was held back for exactly that reason (checked 2026-11-08).** It pairs
+with 158.0.1-beta.41 and resolves cleanly -- only camoufox moves in the lock,
+and `playwright <1.63` leaves our own `<1.61` cap binding -- but
+`test_the_two_local_origins_are_different_sites` fails on it, and not
+intermittently:
+
+```
+the same site drifted inside one session: c89986f233bcc95e vs 18783082dfefe009
+```
+
+Canvas randomisation is per site per session on 156, and on 158 it changes on
+every read. That matters here more than a failing test usually would: a real
+browser hands the same site the same canvas twice in one session, so a canvas
+that moves every time it is read announces that it is randomised. `stable_canvas`
+still works and still pins it per profile, which is the mitigation if this is
+ever taken anyway. Re-check when 0.5.10 lands.
+
+Note too that 0.5.9 changed `get_active_path()` to return the build matching the
+pin and `None` when it is absent -- so after a package upgrade the browser
+cannot launch at all until the paired build is fetched, and "no active path"
+means "what is installed is unusable", not "nothing is installed".
+
 Three things about it are load-bearing rather than incidental:
 
 **It never blocks the launch.** No network, GitHub rate-limiting the

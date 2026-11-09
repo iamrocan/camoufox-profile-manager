@@ -329,6 +329,21 @@ def find_update() -> tuple[str, str, int] | None:
     except Exception as exc:  # noqa: BLE001
         log(f"check: no se pudo leer el build instalado ({exc.__class__.__name__})")
 
+    if installed is None:
+        # get_active_path() answers with the build that matches the pin and
+        # None when it is absent, so "no active path" does not mean "nothing
+        # installed" -- it usually means what is installed can no longer be
+        # launched. Say which build that is: "ninguno" sends someone looking
+        # for an empty directory that is not empty.
+        try:
+            from camoufox.multiversion import list_installed
+
+            others = [b.path.name for b in list_installed()]
+            if others:
+                installed = f"{others[0]} (no utilizable con esta camoufox)"
+        except Exception:  # noqa: BLE001
+            pass
+
     wanted = f"{pin.version}-{pin.build}"
     if installed == wanted:
         log(f"check: emparejado ({installed})")
