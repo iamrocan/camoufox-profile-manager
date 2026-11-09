@@ -316,7 +316,20 @@ An upstream data gap, not a regression. Everything else passes.
 **Do not write source files with PowerShell `Set-Content`.** It double-converts
 UTF-8 and mangles every `—`, `…` and accented character in the file. It silently
 corrupted `web/src/app/page.tsx` once. Use an editor, or Python with an explicit
-`encoding="utf-8"`. `grep -c "â€"` finds the damage.
+`encoding="utf-8"`.
+
+Do **not** look for the damage with `grep -c "a-cedilla-euro"`, which this file
+used to recommend. grep works on bytes and knows nothing of the encoding, so the
+pattern matches the first two bytes of every perfectly healthy em dash: it
+reported 21 hits in a file that was completely clean, and nearly sent someone
+chasing a fault that was not there. Decode first, then look:
+
+```bash
+python -c "import pathlib,sys; t=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8');   print([m for m in ('â€','Ã©','Ã¡','Ã³','Ã±') if m in t] or 'limpio')" FILE
+```
+
+A real double-encoding leaves those sequences in the *decoded* text. A healthy
+file decodes to the dash or accent itself and reports clean.
 
 **`uv run` re-resolves the environment on every invocation.** That costs seconds
 of startup and fails outright with no network, which is why `launch.vbs` and
