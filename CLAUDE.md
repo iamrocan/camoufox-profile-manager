@@ -149,8 +149,28 @@ avoid -- same message, no shortcut, and nothing saying why. It writes the
 `.lnk` through `IShellLinkW` with `ctypes` now: `python.exe` is signed and a COM
 call from it is an ordinary call. Do not reach for PowerShell here again.
 
-Do not suggest turning SAC off: it cannot be turned back on without
-reinstalling Windows, and the signed route costs nothing.
+### SAC and this app cannot both run
+
+Everything above keeps *our* code on signed binaries. It does not save the
+browser. `camoufox.exe` is a third-party Firefox build and is **NotSigned**, so
+on a machine with SAC on, launching a profile is blocked however the manager
+got started. The manager opens, the interface works, and the browser never
+appears.
+
+There is no way around it from inside. **Smart App Control has no allowlist and
+no path exclusions** -- Microsoft's own answers say so. The "add an exclusion"
+people remember is Microsoft Defender Antivirus, a different mechanism that
+does not affect SAC at all, and adding the folder there changes nothing here.
+
+So on a machine with SAC on, the choice is SAC or this app. Turning SAC off is
+the only way to use the browser, and **it is reversible**: the April 2026
+cumulative update (KB5083769, Windows 11 25H2) removed the clean-install
+requirement, and Microsoft's own FAQ now says it can be re-enabled from Windows
+Security. Earlier notes here said the opposite, which was true when they were
+written and is not any more -- do not repeat it.
+
+*Seguridad de Windows -> Control de aplicaciones y explorador -> Smart App
+Control*. Check the build first: on older ones the old rule still applies.
 
 For a launch that fails for *any* reason, run the diagnostic rather than
 guessing, because several unrelated causes look identical from outside:

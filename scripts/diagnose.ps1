@@ -132,6 +132,15 @@ if ($bv -match 'No module named') {
     $cur = ([regex]::Match($bv, 'Current browser\s+(\S+)')).Groups[1].Value
     if ($inst -eq 'Yes') { "instalado, " + $cur } else { "NO DESCARGADO  <-- descargalo con: .venv\Scripts\python.exe -m camoufox fetch" }
 }
+# The binary that actually gets launched, and the one SAC judges. It is a
+# third-party Firefox build and is never signed, so with SAC on this is where
+# a profile launch dies -- after the manager has opened and looked fine.
+$exe = Get-ChildItem (Join-Path $env:LOCALAPPDATA 'camoufox\camoufox\Cache\browsers') -Filter camoufox.exe -Recurse -EA SilentlyContinue | Select-Object -First 1
+if ($exe) {
+    "firma del navegador    : " + (Get-AuthenticodeSignature $exe.FullName).Status
+    $sac = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' -EA SilentlyContinue).VerifiedAndReputablePolicyState
+    if ($sac -eq 1) { "  >> SAC esta en 1 y el navegador no esta firmado: lanzar un perfil sera bloqueado." }
+}
 
 # prelaunch sits on the launch path and runs windowless, so when it goes wrong
 # it goes wrong invisibly. Its log is the only account of what happened.
