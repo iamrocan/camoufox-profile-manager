@@ -246,6 +246,14 @@ class BrowserSessionManager:
                 camoufox = AsyncCamoufox(**launch_options)
                 browser = await camoufox.start()
             except Exception as exc:  # noqa: BLE001
+                # Smart App Control refuses the browser binary outright, and
+                # the error that surfaces names neither Windows nor the policy.
+                # Say so here rather than let someone debug the manager.
+                from camoufox_pm.core.app_control import explain_launch_failure
+
+                explained = explain_launch_failure(str(exc))
+                if explained:
+                    raise BrowserLaunchError(explained) from exc
                 raise BrowserLaunchError(f"Failed to launch browser: {exc}") from exc
 
             process_id = _resolve_process_id(browser) or _resolve_process_id(camoufox)

@@ -263,7 +263,11 @@ export default function ProfilesPage() {
         await profilesAPI.startProfile(profile.id)
         await Promise.all([loadRunning(), loadProfiles()])
       } catch (err) {
-        toast('error', t('toast.launchFailed'), String(err))
+        if (isAppControlBlock(err)) {
+          toast('error', t('appControl.title'), t('appControl.body'))
+        } else {
+          toast('error', t('toast.launchFailed'), String(err))
+        }
       }
     })
   }
@@ -437,6 +441,15 @@ export default function ProfilesPage() {
     } catch (err) {
       toast('error', t('proxy.toggleFailed'), String(err))
     }
+  }
+
+  // Raised by core/app_control.py when a launch fails on a machine where
+  // Smart App Control is enforcing. Nothing in the app can fix that, so the
+  // least it can do is say what happened in the reader's own language
+  // instead of showing a Playwright exception that names neither Windows
+  // nor the policy.
+  function isAppControlBlock(err: unknown): boolean {
+    return String(err).includes('SMART_APP_CONTROL')
   }
 
   async function toggleDarkMode(profile: Profile) {

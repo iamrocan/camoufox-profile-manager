@@ -127,6 +127,9 @@ const en = {
   'darkMode.disabledBody':
     '{name} will open sites as they come from the next launch, and without the Dark Reader extension.',
   'darkMode.toggleFailed': 'Could not change the dark mode setting',
+  'appControl.title': 'Windows is blocking the browser',
+  'appControl.body':
+    'Smart App Control is on, and the Camoufox browser is an unsigned build, so Windows refuses to start it. There is no way to allow just this app: Smart App Control has no exclusions. Turn it off in Windows Security → App & browser control → Smart App Control. Since the April 2026 update you can turn it back on there too.',
 
   // The page a profile opens on launch
   'startup.title': 'Startup page',
@@ -634,6 +637,9 @@ const es: Record<MessageKey, string> = {
   'darkMode.disabledBody':
     '{name} abrirá los sitios tal como vengan desde el próximo arranque, y sin la extensión Dark Reader.',
   'darkMode.toggleFailed': 'No se pudo cambiar el ajuste de modo oscuro',
+  'appControl.title': 'Windows está bloqueando el navegador',
+  'appControl.body':
+    'Smart App Control está encendido y el navegador Camoufox es una compilación sin firmar, así que Windows se niega a arrancarlo. No se puede permitir solo esta app: Smart App Control no admite exclusiones. Apágalo en Seguridad de Windows → Control de aplicaciones y explorador → Smart App Control. Desde la actualización de abril de 2026 puedes volver a encenderlo ahí mismo.',
 
   'startup.title': 'Página de inicio',
   'startup.hint':
