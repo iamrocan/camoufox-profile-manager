@@ -430,6 +430,127 @@ def venv_bin(target: Path, name: str) -> Path:
     return target / ".venv" / sub / f"{name}{suffix}"
 
 
+# IShellLinkW and IPersistFile, called straight from this process.
+#
+# Not PowerShell. Smart App Control puts PowerShell into Constrained Language
+# Mode, where `New-Object -ComObject` is refused outright -- so the script that
+# used to write this shortcut was itself blocked, with the same "part of this
+# app has been blocked" the shortcut exists to avoid. python.exe is signed and
+# a COM call from it is an ordinary call, so this works whether SAC is on or
+# off, and it needs no second shell, no temporary file and no quoting that has
+# to survive two of them.
+_CLSID_SHELL_LINK = "{00021401-0000-0000-C000-000000000046}"
+_IID_SHELL_LINK_W = "{000214F9-0000-0000-C000-000000000046}"
+_IID_PERSIST_FILE = "{0000010B-0000-0000-C000-000000000046}"
+
+# Vtable slots, counted from IUnknown's QueryInterface/AddRef/Release at 0-2.
+_SLOT_RELEASE = 2
+_SLOT_SET_DESCRIPTION = 7
+_SLOT_SET_WORKING_DIRECTORY = 9
+_SLOT_SET_ARGUMENTS = 11
+_SLOT_SET_ICON_LOCATION = 17
+_SLOT_SET_PATH = 20
+_SLOT_PERSIST_SAVE = 6
+
+
+def _vtable_call(ptr, slot, restype, *argtypes):
+    """Bind one method out of a COM object's vtable."""
+    import ctypes
+
+    vtable = ctypes.cast(ptr, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    return ctypes.WINFUNCTYPE(restype, ctypes.c_void_p, *argtypes)(vtable[slot])
+
+
+def desktop_dir() -> Path:
+    """The Desktop, asking Windows rather than assuming ~/Desktop.
+
+    It can be redirected -- OneDrive does it by default -- and a shortcut
+    written to the folder that is no longer the Desktop is a shortcut nobody
+    ever sees.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    try:
+        folderid_desktop = ctypes.create_unicode_buffer(
+            "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}"
+        )
+        guid = (ctypes.c_byte * 16)()
+        ctypes.oledll.ole32.CLSIDFromString(folderid_desktop, ctypes.byref(guid))
+        out = ctypes.c_wchar_p()
+        ctypes.oledll.shell32.SHGetKnownFolderPath(
+            ctypes.byref(guid), 0, wintypes.HANDLE(0), ctypes.byref(out)
+        )
+        try:
+            return Path(out.value)
+        finally:
+            ctypes.windll.ole32.CoTaskMemFree(out)
+    except Exception:  # noqa: BLE001 - fall back to the usual places
+        home_desktop = Path.home() / "Desktop"
+        if home_desktop.is_dir():
+            return home_desktop
+        onedrive = Path(os.environ.get("OneDrive", "")) / "Desktop"
+        return onedrive if onedrive.is_dir() else home_desktop
+
+
+def write_shortcut(
+    link: Path, target: Path, arguments: str, workdir: Path, description: str, icon: Path | None
+) -> None:
+    """Write a .lnk. Raises on any failure, for the caller to report."""
+    import ctypes
+    from ctypes import c_void_p, c_wchar_p
+
+    ole32 = ctypes.oledll.ole32
+
+    def guid(text: str):
+        buf = (ctypes.c_byte * 16)()
+        ole32.CLSIDFromString(ctypes.create_unicode_buffer(text), ctypes.byref(buf))
+        return buf
+
+    ole32.CoInitialize(None)
+    try:
+        shell = c_void_p()
+        ole32.CoCreateInstance(
+            ctypes.byref(guid(_CLSID_SHELL_LINK)),
+            None,
+            1,  # CLSCTX_INPROC_SERVER
+            ctypes.byref(guid(_IID_SHELL_LINK_W)),
+            ctypes.byref(shell),
+        )
+        try:
+            _vtable_call(shell, _SLOT_SET_PATH, ctypes.HRESULT, c_wchar_p)(
+                shell, c_wchar_p(str(target))
+            )
+            _vtable_call(shell, _SLOT_SET_ARGUMENTS, ctypes.HRESULT, c_wchar_p)(
+                shell, c_wchar_p(arguments)
+            )
+            _vtable_call(shell, _SLOT_SET_WORKING_DIRECTORY, ctypes.HRESULT, c_wchar_p)(
+                shell, c_wchar_p(str(workdir))
+            )
+            _vtable_call(shell, _SLOT_SET_DESCRIPTION, ctypes.HRESULT, c_wchar_p)(
+                shell, c_wchar_p(description)
+            )
+            if icon is not None:
+                _vtable_call(
+                    shell, _SLOT_SET_ICON_LOCATION, ctypes.HRESULT, c_wchar_p, ctypes.c_int
+                )(shell, c_wchar_p(str(icon)), 0)
+
+            persist = c_void_p()
+            _vtable_call(shell, 0, ctypes.HRESULT, c_void_p, c_void_p)(
+                shell, ctypes.byref(guid(_IID_PERSIST_FILE)), ctypes.byref(persist)
+            )
+            try:
+                _vtable_call(
+                    persist, _SLOT_PERSIST_SAVE, ctypes.HRESULT, c_wchar_p, ctypes.c_int
+                )(persist, c_wchar_p(str(link)), 1)
+            finally:
+                _vtable_call(persist, _SLOT_RELEASE, ctypes.c_ulong)(persist)
+        finally:
+            _vtable_call(shell, _SLOT_RELEASE, ctypes.c_ulong)(shell)
+    finally:
+        ctypes.windll.ole32.CoUninitialize()
+
+
 def create_shortcut(target: Path) -> Path | None:
     step("Creando el acceso directo en el escritorio")
 
@@ -462,42 +583,27 @@ def create_shortcut(target: Path) -> Path | None:
         warn(f"no se encontró {prelaunch}; el acceso directo no buscará actualizaciones.")
         arguments = "-m camoufox_pm.cli --desktop"
 
-    # Built by PowerShell because the shortcut format is a COM object, and the
-    # script is written to a file so no quoting has to survive two shells.
-    ps = f"""
-$desktop = [Environment]::GetFolderPath('Desktop')
-$link = Join-Path $desktop '{SHORTCUT_NAME}.lnk'
-$shell = New-Object -ComObject WScript.Shell
-$sc = $shell.CreateShortcut($link)
-$sc.TargetPath = '{pythonw}'
-$sc.Arguments = '{arguments}'
-$sc.WorkingDirectory = '{target}'
-$sc.Description = 'Camoufox Profile Manager'
-{f"$sc.IconLocation = '{icon}'" if icon.is_file() else ""}
-$sc.Save()
-Write-Output $link
-"""
-    with tempfile.TemporaryDirectory() as tmp:
-        script = Path(tmp) / "shortcut.ps1"
-        script.write_text(ps, encoding="utf-8")
-        result = subprocess.run(
-            [
-                "powershell", "-NoProfile", "-NonInteractive",
-                "-ExecutionPolicy", "Bypass", "-File", str(script),
-            ],
-            capture_output=True,
-            text=True,
+    link = desktop_dir() / f"{SHORTCUT_NAME}.lnk"
+    try:
+        write_shortcut(
+            link,
+            pythonw,
+            arguments,
+            target,
+            "Camoufox Profile Manager",
+            icon if icon.is_file() else None,
         )
-
-    if result.returncode != 0:
-        warn(f"no se pudo crear el acceso directo: {(result.stderr or '').strip()[:300]}")
+    except Exception as exc:  # noqa: BLE001 - report, do not take the install down
+        warn(f"no se pudo crear el acceso directo: {exc}")
         warn(f"Puedes abrir la app igualmente con {target / 'launch.bat'}")
         return None
 
-    link = (result.stdout or "").strip().splitlines()
-    path = Path(link[-1]) if link else None
-    info(f"Acceso directo: {path}")
-    return path
+    if not link.is_file():
+        warn(f"el acceso directo no quedó escrito en {link}")
+        return None
+
+    info(f"Acceso directo: {link}")
+    return link
 
 
 def install_target(explicit: Path | None) -> Path:

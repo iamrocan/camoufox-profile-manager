@@ -141,6 +141,14 @@ already wrote:
 python install.py --shortcut-only   # repoints the shortcut, installs nothing
 ```
 
+SAC's script enforcement also puts **PowerShell** into Constrained Language
+Mode, where `New-Object -ComObject` is refused. `install.py` used to write the
+shortcut by running a generated `.ps1`, so on a SAC machine the thing that
+creates the shortcut was blocked by the same policy the shortcut exists to
+avoid -- same message, no shortcut, and nothing saying why. It writes the
+`.lnk` through `IShellLinkW` with `ctypes` now: `python.exe` is signed and a COM
+call from it is an ordinary call. Do not reach for PowerShell here again.
+
 Do not suggest turning SAC off: it cannot be turned back on without
 reinstalling Windows, and the signed route costs nothing.
 
